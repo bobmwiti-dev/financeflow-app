@@ -1,0 +1,224 @@
+import 'package:path/path.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:logging/logging.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:crypto/crypto.dart';
+import 'dart:convert' show json, utf8;
+
+import '../models/user_model.dart';
+
+/// Database service for FinanceFlow app
+/// Handles database operations for user authentication and data storage
+class DatabaseService {
+  // Singleton pattern
+  static final DatabaseService _instance = DatabaseService._internal();
+  factory DatabaseService() => _instance;
+  static DatabaseService get instance => _instance;
+  DatabaseService._internal();
+  
+  final _logger = Logger('DatabaseService');
+  Database? _db;
+
+  // Get database instance
+  Future<Database> get database async {
+    if (_db != null) return _db!;
+    await _initDatabase();
+    return _db!;
+  }
+
+  // Initialize the database
+  Future<void> _initDatabase() async {
+    try {
+      String path = join(await getDatabasesPath(), 'finance_flow.db');
+      _logger.info('Initializing database at path: $path');
+      
+      if (kIsWeb) {
+        // For web platform, use in-memory database
+        _logger.info('Using in-memory database for web platform');
+        _db = await openDatabase(
+          inMemoryDatabasePath,
+          version: 1,
+          onCreate: _onCreate,
+        );
+        await _initMockData();
+      } else {
+        _db = await openDatabase(
+          path,
+          version: 1,
+          onCreate: _onCreate,
+        );
+      }
+      _logger.info('Database initialized successfully');
+    } catch (e) {
+      _logger.severe('Error initializing database: $e');
+      rethrow;
+    }
+  }
+
+  // Initialize mock data for web platform
+  Future<void> _initMockData() async {
+    _logger.info('Initializing mock data for web platform');
+    
+    // Add a mock user
+    try {
+      await insertUser(
+        User(
+          id: 1,
+          email: 'demo@example.com',
+          name: 'Demo User',
+          createdAt: DateTime.now(),
+          lastLogin: DateTime.now(),
+          preferences: {},
+        ),
+        'password123'
+      );
+      _logger.info('Added mock user: demo@example.com / password123');
+    } catch (e) {
+      _logger.warning('Error adding mock user: $e');
+    }
+  }
+
+  // Create database tables
+  Future<void> _onCreate(Database db, int version) async {
+    _logger.info('Creating database tables...');
+    
+    // Create users table
+    await db.execute('''
+      CREATE TABLE users (
+        id INTEGER PRIMARY KEY,
+        email TEXT UNIQUE,
+        name TEXT,
+        password_hash TEXT,
+        created_at TEXT,
+        last_login TEXT,
+        preferences TEXT
+      )
+    ''');
+  }
+
+  // Hash password using SHA-256
+  String _hashPassword(String password) {
+    final bytes = utf8.encode(password);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
+  // Insert a new user or update if exists
+  Future<int> insertUser(User user, String password) async {
+    Database db = await database;
+    final passwordHash = _hashPassword(password);
+    
+    // Create a properly formatted map for the database
+    final Map<String, dynamic> userMap = {
+      'id': user.id,
+      'email': user.email,
+      'name': user.name,
+      'password_hash': passwordHash,
+      'created_at': user.createdAt.toIso8601String(),
+      'last_login': user.lastLogin?.toIso8601String(),
+      'preferences': user.preferences != null ? json.encode(user.preferences) : null,
+    };
+    
+    try {
+      _logger.info('Inserting user: ${user.email}');
+      return await db.insert('users', userMap);
+    } catch (e) {
+      _logger.warning('Error inserting user: $e');
+      // If the user already exists (due to unique email constraint), try updating instead
+      if (e.toString().contains('UNIQUE constraint failed')) {
+        _logger.info('User already exists, updating: ${user.email}');
+        return await db.update(
+          'users',
+          userMap,
+          where: 'email = ?',
+          whereArgs: [user.email],
+        );
+      }
+      rethrow;
+    }
+  }
+
+  // Get user by ID
+  Future<User?> getUserById(int id) async {
+    Database db = await database;
+    List<Map<String, dynamic>> maps = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    
+    if (maps.isEmpty) return null;
+    return User.fromMap(maps.first);
+  }
+  
+  // Get user by email
+  Future<User?> getUserByEmail(String email) async {
+    Database db = await database;
+    List<Map<String, dynamic>> maps = await db.query(
+      'users',
+      where: 'email = ?',
+      whereArgs: [email],
+    );
+    
+    if (maps.isEmpty) return null;
+    return User.fromMap(maps.first);
+  }
+  
+  // Authenticate user with email and password
+  Future<User?> authenticateUser(String email, String password) async {
+    Database db = await database;
+    final passwordHash = _hashPassword(password);
+    
+    List<Map<String, dynamic>> maps = await db.query(
+      'users',
+      where: 'email = ? AND password_hash = ?',
+      whereArgs: [email, passwordHash],
+    );
+    
+    if (maps.isEmpty) return null;
+    return User.fromMap(maps.first);
+  }
+  
+  // Update user information
+  Future<int> updateUser(User user) async {
+    Database db = await database;
+    Map<String, dynamic> userMap = {
+      'id': user.id,
+      'email': user.email,
+      'name': user.name,
+      'created_at': user.createdAt.toIso8601String(),
+      'last_login': user.lastLogin?.toIso8601String(),
+      'preferences': user.preferences != null ? json.encode(user.preferences) : null,
+    };
+    
+    return await db.update(
+      'users',
+      userMap,
+      where: 'id = ?',
+      whereArgs: [user.id],
+    );
+  }
+  
+  // Update user password
+  Future<int> updateUserPassword(int userId, String newPassword) async {
+    Database db = await database;
+    final passwordHash = _hashPassword(newPassword);
+    
+    return await db.update(
+      'users',
+      {'password_hash': passwordHash},
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+  }
+  
+  // Delete user by ID
+  Future<int> deleteUser(int id) async {
+    Database db = await database;
+    return await db.delete(
+      'users',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+}

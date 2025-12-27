@@ -1,0 +1,200 @@
+class Transaction {
+  final int? id; // Local database ID
+  final String? firestoreId; // Firestore document ID
+  final String title;
+  final double amount;
+  final DateTime date;
+  final String category;
+  final String? description;
+  final String? paymentMethod;
+  final String status; // 'Paid', 'Unpaid', 'Partial'
+  final double? paidAmount; // For partial payments
+  final bool isCarriedForward; // Indicates if this was carried forward from previous month
+  final String? originalTransactionId; // Reference to the original transaction if carried forward
+
+  Transaction({
+    this.id,
+    this.firestoreId,
+    required this.title,
+    required this.amount,
+    required this.date,
+    required this.category,
+    this.description,
+    this.paymentMethod,
+    this.status = 'Unpaid',
+    this.paidAmount = 0.0,
+    this.isCarriedForward = false,
+    this.originalTransactionId,
+  });
+
+  double get remainingAmount => amount - (paidAmount ?? 0.0);
+  
+  bool get isPaid => status == 'Paid';
+  
+  bool get isUnpaid => status == 'Unpaid';
+  
+  bool get isPartiallyPaid => status == 'Partial';
+  
+  bool get shouldCarryForward {
+    // Only carry forward if unpaid or partially paid and category is in carry forward list
+    if (isPaid) return false;
+    
+    // Check if this category should be carried forward
+    // This will be implemented with AppConstants.carryForwardCategories
+    return true;
+  }
+
+  // For SQLite database
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'firestoreId': firestoreId,
+      'title': title,
+      'amount': amount,
+      'date': date.toIso8601String(),
+      'category': category,
+      'description': description,
+      'paymentMethod': paymentMethod,
+      'status': status,
+      'paidAmount': paidAmount,
+      'isCarriedForward': isCarriedForward ? 1 : 0,
+      'originalTransactionId': originalTransactionId,
+    };
+  }
+
+  // For SQLite database
+  factory Transaction.fromMap(Map<String, dynamic> map) {
+    return Transaction(
+      id: map['id'] as int?,
+      firestoreId: map['firestoreId'] as String?,
+      title: map['title'] as String,
+      amount: (map['amount'] as num).toDouble(),
+      date: DateTime.parse(map['date'] as String),
+      category: map['category'] as String,
+      description: map['description'] as String?,
+      paymentMethod: map['paymentMethod'] as String?,
+      status: map['status'] as String? ?? 'Unpaid',
+      paidAmount: map['paidAmount'] != null ? (map['paidAmount'] as num).toDouble() : null,
+      isCarriedForward: map['isCarriedForward'] == 1,
+      originalTransactionId: map['originalTransactionId'] as String?,
+    );
+  }
+
+  // For JSON serialization
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'firestoreId': firestoreId,
+      'title': title,
+      'amount': amount,
+      'date': date.toIso8601String(),
+      'category': category,
+      'description': description,
+      'paymentMethod': paymentMethod,
+      'status': status,
+      'paidAmount': paidAmount,
+      'isCarriedForward': isCarriedForward,
+      'originalTransactionId': originalTransactionId,
+    };
+  }
+
+  // For JSON deserialization
+  factory Transaction.fromJson(Map<String, dynamic> json) {
+    return Transaction(
+      id: json['id'] as int?,
+      firestoreId: json['firestoreId'] as String?,
+      title: json['title'] as String,
+      amount: (json['amount'] as num).toDouble(),
+      date: DateTime.parse(json['date'] as String),
+      category: json['category'] as String,
+      description: json['description'] as String?,
+      paymentMethod: json['paymentMethod'] as String?,
+      status: json['status'] as String? ?? 'Unpaid',
+      paidAmount: json['paidAmount'] != null ? (json['paidAmount'] as num).toDouble() : null,
+      isCarriedForward: json['isCarriedForward'] as bool? ?? false,
+      originalTransactionId: json['originalTransactionId'] as String?,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'Transaction{id: $id, firestoreId: $firestoreId, title: $title, amount: $amount, date: $date, category: $category}';
+  }
+
+  // Create a copy with updated values
+  Transaction copyWith({
+    int? id,
+    String? firestoreId,
+    String? title,
+    double? amount,
+    DateTime? date,
+    String? category,
+    String? description,
+    String? paymentMethod,
+    String? status,
+    double? paidAmount,
+    bool? isCarriedForward,
+    String? originalTransactionId,
+  }) {
+    return Transaction(
+      id: id ?? this.id,
+      firestoreId: firestoreId ?? this.firestoreId,
+      title: title ?? this.title,
+      amount: amount ?? this.amount,
+      date: date ?? this.date,
+      category: category ?? this.category,
+      description: description ?? this.description,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      status: status ?? this.status,
+      paidAmount: paidAmount ?? this.paidAmount,
+      isCarriedForward: isCarriedForward ?? this.isCarriedForward,
+      originalTransactionId: originalTransactionId ?? this.originalTransactionId,
+    );
+  }
+  
+  // Create a Transaction from Firestore document
+  factory Transaction.fromFirestore(Map<String, dynamic> data, String docId) {
+    // Handle Firestore Timestamp conversion to DateTime
+    DateTime date;
+    if (data['date'] is DateTime) {
+      date = data['date'] as DateTime;
+    } else if (data['date'] != null) {
+      // Handle Firestore Timestamp
+      date = (data['date'] as dynamic).toDate();
+    } else {
+      date = DateTime.now();
+    }
+    
+    return Transaction(
+      firestoreId: docId,
+      title: data['title'] as String? ?? '',
+      amount: (data['amount'] as num?)?.toDouble() ?? 0.0,
+      date: date,
+      category: data['category'] as String? ?? 'Uncategorized',
+      description: data['description'] as String?,
+      paymentMethod: data['paymentMethod'] as String?,
+      status: data['status'] as String? ?? 'Unpaid',
+      paidAmount: (data['paidAmount'] as num?)?.toDouble(),
+      isCarriedForward: data['isCarriedForward'] as bool? ?? false,
+      originalTransactionId: data['originalTransactionId'] as String?,
+    );
+  }
+  
+  // Convert Transaction to Firestore document
+  Map<String, dynamic> toFirestore() {
+    return {
+      'title': title,
+      'amount': amount,
+      'date': date,
+      'category': category,
+      'description': description,
+      'paymentMethod': paymentMethod,
+      'status': status,
+      'paidAmount': paidAmount,
+      'isCarriedForward': isCarriedForward,
+      'originalTransactionId': originalTransactionId,
+      'createdAt': DateTime.now(),
+      'updatedAt': DateTime.now(),
+    };
+  }
+}

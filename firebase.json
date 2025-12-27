@@ -1,0 +1,29 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "financeflow-app",
+          "appId": "1:48069298147:android:9efb124878c333c94102d6",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "financeflow-app",
+          "configurations": {
+            "android": "1:48069298147:android:9efb124878c333c94102d6",
+            "ios": "1:48069298147:ios:4e3adba725e150f44102d6",
+            "macos": "1:48069298147:ios:4e3adba725e150f44102d6",
+            "web": "1:48069298147:web:5394db2ee5a3384e4102d6",
+            "windows": "1:48069298147:web:aac630bcd41de6d84102d6"
+          }
+        }
+      }
+    }
+  }
+}

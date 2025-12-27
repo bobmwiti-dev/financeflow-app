@@ -1,0 +1,21 @@
+import 'package:flutter/material.dart';
+import 'main.dart' as main_app;
+
+/// Redirects to the main app to ensure consistent UI
+void main() {
+  // Redirect to the main app entry point
+  debugPrint('Auth test app redirecting to main app');
+  main_app.main();
+}
+
+// Auth test app is now redirected to main app
+// This class is no longer used but kept for reference
+class AuthTestApp extends StatelessWidget {
+  const AuthTestApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // This code is no longer executed as we redirect directly to main app
+    return const SizedBox.shrink();
+  }
+}

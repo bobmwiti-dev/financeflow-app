@@ -1,0 +1,302 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:logging/logging.dart';
+import '../models/transaction_model.dart' as models;
+
+class TransactionService {
+  // Singleton pattern
+  static final TransactionService _instance = TransactionService._internal();
+  static TransactionService get instance => _instance;
+  factory TransactionService() => _instance;
+  
+  TransactionService._internal();
+  
+  final Logger _logger = Logger('TransactionService');
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  
+  // Get current user ID
+  String? get _userId => _auth.currentUser?.uid;
+  
+  // Collection reference
+  CollectionReference get _transactionsCollection => 
+      _firestore.collection('users').doc(_userId).collection('transactions');
+  
+  // Get transactions stream for real-time updates
+  Stream<List<models.Transaction>> getTransactionsStream() {
+    if (_userId == null) {
+      _logger.warning('No authenticated user found');
+      return Stream.value([]);
+    }
+    
+    return _transactionsCollection
+        .orderBy('date', descending: true)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return models.Transaction.fromFirestore(data, doc.id);
+          }).toList();
+        });
+  }
+  
+  // Get transactions for a specific month
+  Stream<List<models.Transaction>> getTransactionsByMonth(DateTime month) {
+    if (_userId == null) {
+      _logger.warning('No authenticated user found');
+      return Stream.value([]);
+    }
+    
+    // Calculate start and end dates for the month
+    final startDate = DateTime(month.year, month.month, 1);
+    final endDate = DateTime(month.year, month.month + 1, 0, 23, 59, 59);
+    
+    return _transactionsCollection
+        .where('date', isGreaterThanOrEqualTo: startDate)
+        .where('date', isLessThanOrEqualTo: endDate)
+        .orderBy('date', descending: true)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return models.Transaction.fromFirestore(data, doc.id);
+          }).toList();
+        });
+  }
+  
+  // Get recent transactions
+  Future<List<models.Transaction>> getRecentTransactions(int limit) async {
+    if (_userId == null) {
+      _logger.warning('No authenticated user found');
+      return [];
+    }
+    
+    try {
+      final snapshot = await _transactionsCollection
+          .orderBy('date', descending: true)
+          .limit(limit)
+          .get();
+          
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return models.Transaction.fromFirestore(data, doc.id);
+      }).toList();
+    } catch (e) {
+      _logger.severe('Error getting recent transactions: $e');
+      return [];
+    }
+  }
+  
+  // Add a new transaction
+  Future<String?> addTransaction(models.Transaction transaction) async {
+    if (_userId == null) {
+      _logger.warning('No authenticated user found');
+      return null;
+    }
+    
+    try {
+      final docRef = await _transactionsCollection.add(transaction.toFirestore());
+      _logger.info('Added transaction with ID: ${docRef.id}');
+      return docRef.id;
+    } catch (e) {
+      _logger.severe('Error adding transaction: $e');
+      return null;
+    }
+  }
+  
+  // Update an existing transaction
+  Future<bool> updateTransaction(String id, models.Transaction transaction) async {
+    if (_userId == null) {
+      _logger.warning('No authenticated user found');
+      return false;
+    }
+    
+    try {
+      await _transactionsCollection.doc(id).update(transaction.toFirestore());
+      _logger.info('Updated transaction with ID: $id');
+      return true;
+    } catch (e) {
+      _logger.severe('Error updating transaction: $e');
+      return false;
+    }
+  }
+  
+  // Delete a transaction
+  Future<bool> deleteTransaction(String id) async {
+    if (_userId == null) {
+      _logger.warning('No authenticated user found');
+      return false;
+    }
+    
+    try {
+      await _transactionsCollection.doc(id).delete();
+      _logger.info('Deleted transaction with ID: $id');
+      return true;
+    } catch (e) {
+      _logger.severe('Error deleting transaction: $e');
+      return false;
+    }
+  }
+  
+  // Get spending by category for a specific month
+  Future<Map<String, double>> getSpendingByCategory(DateTime month) async {
+    if (_userId == null) {
+      _logger.warning('No authenticated user found');
+      return {};
+    }
+    
+    try {
+      // Calculate start and end dates for the month
+      final startDate = DateTime(month.year, month.month, 1);
+      final endDate = DateTime(month.year, month.month + 1, 0, 23, 59, 59);
+      
+      final snapshot = await _transactionsCollection
+          .where('date', isGreaterThanOrEqualTo: startDate)
+          .where('date', isLessThanOrEqualTo: endDate)
+          .get();
+          
+      final transactions = snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return models.Transaction.fromFirestore(data, doc.id);
+      }).toList();
+      
+      // Group transactions by category and sum amounts
+      final Map<String, double> categoryTotals = {};
+      for (final transaction in transactions) {
+        final category = transaction.category;
+        final amount = transaction.amount;
+        
+        if (categoryTotals.containsKey(category)) {
+          categoryTotals[category] = categoryTotals[category]! + amount;
+        } else {
+          categoryTotals[category] = amount;
+        }
+      }
+      
+      return categoryTotals;
+    } catch (e) {
+      _logger.severe('Error getting spending by category: $e');
+      return {};
+    }
+  }
+  
+  // Get monthly spending trend for the last n months
+  Future<List<Map<String, dynamic>>> getMonthlySpendingTrend(int months) async {
+    if (_userId == null) {
+      _logger.warning('No authenticated user found');
+      return [];
+    }
+    
+    try {
+      final now = DateTime.now();
+      final List<Map<String, dynamic>> monthlyTotals = [];
+      
+      // Calculate totals for each month
+      for (int i = 0; i < months; i++) {
+        final targetMonth = DateTime(now.year, now.month - i, 1);
+        final endDate = DateTime(targetMonth.year, targetMonth.month + 1, 0, 23, 59, 59);
+        
+        final snapshot = await _transactionsCollection
+            .where('date', isGreaterThanOrEqualTo: targetMonth)
+            .where('date', isLessThanOrEqualTo: endDate)
+            .get();
+            
+        final transactions = snapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return models.Transaction.fromFirestore(data, doc.id);
+        }).toList();
+        
+        // Sum all transactions for the month
+        double total = 0;
+        for (final transaction in transactions) {
+          total += transaction.amount;
+        }
+        
+        monthlyTotals.add({
+          'month': targetMonth,
+          'total': total,
+        });
+      }
+      
+      // Sort by month (oldest first)
+      monthlyTotals.sort((a, b) => (a['month'] as DateTime).compareTo(b['month'] as DateTime));
+      
+      return monthlyTotals;
+    } catch (e) {
+      _logger.severe('Error getting monthly spending trend: $e');
+      return [];
+    }
+  }
+  
+  // Get total income for a specific month
+  Future<double> getTotalIncome(DateTime month) async {
+    if (_userId == null) {
+      _logger.warning('No authenticated user found');
+      return 0.0;
+    }
+    
+    try {
+      // Calculate start and end dates for the month
+      final startDate = DateTime(month.year, month.month, 1);
+      final endDate = DateTime(month.year, month.month + 1, 0, 23, 59, 59);
+      
+      final snapshot = await _transactionsCollection
+          .where('date', isGreaterThanOrEqualTo: startDate)
+          .where('date', isLessThanOrEqualTo: endDate)
+          .where('amount', isGreaterThan: 0)
+          .get();
+          
+      final transactions = snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return models.Transaction.fromFirestore(data, doc.id);
+      }).toList();
+      
+      // Sum all positive transactions (income)
+      double total = 0;
+      for (final transaction in transactions) {
+        total += transaction.amount;
+      }
+      
+      return total;
+    } catch (e) {
+      _logger.severe('Error getting total income: $e');
+      return 0.0;
+    }
+  }
+  
+  // Get total expenses for a specific month
+  Future<double> getTotalExpenses(DateTime month) async {
+    if (_userId == null) {
+      _logger.warning('No authenticated user found');
+      return 0.0;
+    }
+    
+    try {
+      // Calculate start and end dates for the month
+      final startDate = DateTime(month.year, month.month, 1);
+      final endDate = DateTime(month.year, month.month + 1, 0, 23, 59, 59);
+      
+      final snapshot = await _transactionsCollection
+          .where('date', isGreaterThanOrEqualTo: startDate)
+          .where('date', isLessThanOrEqualTo: endDate)
+          .where('amount', isLessThan: 0)
+          .get();
+          
+      final transactions = snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return models.Transaction.fromFirestore(data, doc.id);
+      }).toList();
+      
+      // Sum all negative transactions (expenses)
+      double total = 0;
+      for (final transaction in transactions) {
+        total += transaction.amount.abs();
+      }
+      
+      return total;
+    } catch (e) {
+      _logger.severe('Error getting total expenses: $e');
+      return 0.0;
+    }
+  }
+}
