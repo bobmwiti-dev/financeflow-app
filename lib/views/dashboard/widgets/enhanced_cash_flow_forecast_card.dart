@@ -41,36 +41,84 @@ class EnhancedCashFlowForecastCard extends StatefulWidget {
 class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastCard> {
   List<CashFlowPoint> _historicalData = [];
   List<CashFlowPoint> _forecastData = [];
-  bool _isLoading = true;
+  bool _isLoading = false;
   double _currentBalance = 0;
   double _projectedBalance = 0;
+  
+  // Cached viewmodels so we can listen for data changes
+  TransactionViewModel? _transactionVm;
+  IncomeViewModel? _incomeVm;
+  BillViewModel? _billVm;
+  VoidCallback? _txListener;
+  VoidCallback? _incomeListener;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Cache providers and listen for data changes
+      _transactionVm = Provider.of<TransactionViewModel>(context, listen: false);
+      _incomeVm = Provider.of<IncomeViewModel>(context, listen: false);
+      _billVm = Provider.of<BillViewModel>(context, listen: false);
+
+      _txListener = _onSourceDataChanged;
+      _incomeListener = _onSourceDataChanged;
+
+      _transactionVm?.addListener(_txListener!);
+      _incomeVm?.addListener(_incomeListener!);
+
       _loadCashFlowData();
     });
   }
 
   Future<void> _loadCashFlowData() async {
+    if (!mounted) return;
+
+    // Avoid overlapping computations
+    if (_isLoading) return;
+
+    final transactionVm = _transactionVm;
+    final incomeVm = _incomeVm;
+    final billVm = _billVm;
+
+    if (transactionVm == null || incomeVm == null || billVm == null) return;
+
     setState(() => _isLoading = true);
     
     try {
-      final transactionVm = Provider.of<TransactionViewModel>(context, listen: false);
-      final incomeVm = Provider.of<IncomeViewModel>(context, listen: false);
-      final billVm = Provider.of<BillViewModel>(context, listen: false);
-      
-      await transactionVm.loadAllTransactions();
-      
+      // Use the current in-memory data from the viewmodels. These are kept
+      // up to date via their own Firestore listeners, so we don't need to
+      // trigger additional queries here.
       _generateHistoricalData(transactionVm, incomeVm);
       _generateForecastData(transactionVm, incomeVm, billVm);
       
     } catch (e) {
       debugPrint('Error loading cash flow data: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
+  }
+
+  void _onSourceDataChanged() {
+    if (!mounted) return;
+
+    // Only recompute when we actually have some data; this avoids
+    // doing work repeatedly while streams are still empty.
+    final hasTransactions = _transactionVm?.transactions.isNotEmpty ?? false;
+    final hasIncome = _incomeVm?.incomeSources.isNotEmpty ?? false;
+
+    if (hasTransactions || hasIncome) {
+      _loadCashFlowData();
+    }
+  }
+
+  @override
+  void dispose() {
+    _transactionVm?.removeListener(_txListener ?? () {});
+    _incomeVm?.removeListener(_incomeListener ?? () {});
+    super.dispose();
   }
 
   void _generateHistoricalData(TransactionViewModel transactionVm, IncomeViewModel incomeVm) {
@@ -119,7 +167,7 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
               transaction.type == TransactionType.expense &&
               transaction.date.isAfter(month.subtract(const Duration(days: 1))) &&
               transaction.date.isBefore(nextMonth))
-          .fold<double>(0, (sum, transaction) => sum + transaction.amount);
+          .fold<double>(0, (sum, transaction) => sum + transaction.amount.abs());
       
       runningBalance += monthlyIncome - monthlyExpenses;
       
@@ -230,7 +278,8 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     for (final transaction in transactionVm.transactions) {
       if (transaction.type == TransactionType.expense) {
         final monthKey = DateTime(transaction.date.year, transaction.date.month, 1);
-        expensesByMonth[monthKey] = (expensesByMonth[monthKey] ?? 0) + transaction.amount;
+        // Store expenses as positive magnitudes per month
+        expensesByMonth[monthKey] = (expensesByMonth[monthKey] ?? 0) + transaction.amount.abs();
       }
     }
     
@@ -313,7 +362,8 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     for (final transaction in transactionVm.transactions) {
       if (transaction.type == TransactionType.expense) {
         final monthIndex = transaction.date.month - 1;
-        monthlyPattern[monthIndex] += transaction.amount;
+        // Use absolute values so expenses are treated as positive outflows
+        monthlyPattern[monthIndex] += transaction.amount.abs();
         monthlyCount[monthIndex]++;
       }
     }
@@ -384,7 +434,8 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
       if (transaction.type == TransactionType.expense) {
         final monthKey = DateTime(transaction.date.year, transaction.date.month, 1);
         if (monthKey.isAfter(DateTime(now.year, now.month - recentMonths, 1))) {
-          expensesByMonth[monthKey] = (expensesByMonth[monthKey] ?? 0) + transaction.amount;
+          // Use absolute values to measure spending trend
+          expensesByMonth[monthKey] = (expensesByMonth[monthKey] ?? 0) + transaction.amount.abs();
         }
       }
     }
