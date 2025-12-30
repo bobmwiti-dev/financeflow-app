@@ -17,9 +17,9 @@ class _SpendingTrendChartState extends State<SpendingTrendChart> {
   @override
   void initState() {
     super.initState();
-    // Fetch the spending history once when the widget is initialized.
+    // Fetch the monthly spending history (last 12 months of actual data) once when the widget is initialized.
     final transactionService = Provider.of<TransactionService>(context, listen: false);
-    _spendingHistoryFuture = transactionService.getMonthlySpendingHistory();
+    _spendingHistoryFuture = transactionService.getMonthlySpendingHistory(numberOfMonths: 12);
   }
 
   @override
@@ -41,10 +41,13 @@ class _SpendingTrendChartState extends State<SpendingTrendChart> {
         double intervalY = 1000; // Default interval
 
         int index = 0;
-        spendingData.forEach((month, total) {
-          spots.add(FlSpot(index.toDouble(), total));
-          monthLabels.add(month.split(' ')[0]); // Show only 'Jan', 'Feb', etc.
-          if (total > maxY) maxY = total;
+        spendingData.forEach((label, total) {
+          final value = total.toDouble();
+          spots.add(FlSpot(index.toDouble(), value));
+          // Label comes as 'MMM yyyy' → show 'MMM'
+          final parts = label.split(' ');
+          monthLabels.add(parts.isNotEmpty ? parts.first : label);
+          if (value > maxY) maxY = value;
           index++;
         });
 
