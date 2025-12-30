@@ -10,6 +10,7 @@ import 'package:logging/logging.dart';
 // Services
 import '../../services/transaction_service.dart';
 import '../../services/realtime_data_service.dart';
+import '../../services/mpesa_import_service.dart';
 
 // Models
 import '../../models/transaction_model.dart' as models;
@@ -108,6 +109,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     
     // Load initial data
     _loadInitialData();
+    
+    // Attempt automatic M-Pesa import once per day (non-blocking)
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await MpesaImportService.autoImportIfNeeded(
+        minInterval: const Duration(hours: 24),
+      );
+    });
     
     // Start entrance animation
     _animationController.forward();

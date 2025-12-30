@@ -3,6 +3,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:telephony/telephony.dart';
 import '../models/mpesa_sms_model.dart';
 import 'mpesa_sms_parser.dart';
+import 'enhanced_mpesa_parser.dart';
 
 /// Service for reading SMS messages from the device
 class SmsReaderService {
@@ -117,7 +118,13 @@ class SmsReaderService {
   }) async {
     try {
       List<SmsMessage> mpesaMessages = await readMpesaSms(maxCount: maxCount, since: since);
+      if (mpesaMessages.isEmpty) {
+        developer.log('No M-Pesa messages to parse', name: _logName);
+        return [];
+      }
+
       List<MpesaSmsTransaction> transactions = [];
+      final List<Map<String, dynamic>> fallbackSmsData = [];
 
       for (SmsMessage message in mpesaMessages) {
         String sender = message.address ?? '';
@@ -127,10 +134,31 @@ class SmsReaderService {
         MpesaSmsTransaction? transaction = MpesaSmsParser.parseSms(body, sender, smsDate);
         if (transaction != null) {
           transactions.add(transaction);
+        } else {
+          fallbackSmsData.add({
+            'body': body,
+            'sender': sender,
+            'timestamp': smsDate.toIso8601String(),
+          });
         }
       }
 
-      developer.log('Parsed ${transactions.length} M-Pesa transactions from ${mpesaMessages.length} SMS messages', name: _logName);
+      if (fallbackSmsData.isNotEmpty) {
+        developer.log(
+          'Falling back to EnhancedMpesaParser for \\${fallbackSmsData.length} SMS messages',
+          name: _logName,
+        );
+        final enhancedTransactions = await EnhancedMpesaParser.parseBatchSms(
+          fallbackSmsData,
+          useIsolate: fallbackSmsData.length > 100,
+        );
+        transactions.addAll(enhancedTransactions);
+      }
+
+      developer.log(
+        'Parsed \\${transactions.length} M-Pesa transactions from \\${mpesaMessages.length} SMS messages',
+        name: _logName,
+      );
       return transactions;
     } catch (e) {
       developer.log('Error parsing M-Pesa SMS messages: $e', name: _logName);

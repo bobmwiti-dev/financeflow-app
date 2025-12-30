@@ -18,6 +18,7 @@ class _MpesaImportCardState extends State<MpesaImportCard> {
   bool _isLoading = true;
   Map<String, dynamic> _importStats = {};
   bool _hasPermission = false;
+  bool _isImporting = false;
 
   @override
   void initState() {
@@ -42,6 +43,56 @@ class _MpesaImportCardState extends State<MpesaImportCard> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _importNow() async {
+    if (_isImporting) return;
+    // Capture ScaffoldMessenger before any async gaps to avoid using
+    // BuildContext across awaits.
+    final messenger = ScaffoldMessenger.of(context);
+
+    setState(() {
+      _isImporting = true;
+    });
+
+    try {
+      final lastImportDate = _importStats['lastImportDate'] as DateTime?;
+      final result = await MpesaImportService.importTransactions(
+        since: lastImportDate,
+        maxDays: 30,
+        categorizeAutomatically: true,
+        skipDuplicates: true,
+      );
+
+      if (!mounted) return;
+
+      await _loadMpesaStatus();
+
+      if (result.success && result.imported > 0) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Imported ${result.imported} M-Pesa transactions'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.severe('Error importing M-Pesa from dashboard card: $e');
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Error importing M-Pesa transactions'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isImporting = false;
         });
       }
     }
@@ -137,6 +188,8 @@ class _MpesaImportCardState extends State<MpesaImportCard> {
                     ),
                   ],
                 ),
+                if (_hasPermission && (_importStats['pendingTransactions'] ?? 0) > 0)
+                  _buildImportBanner(),
                 if (_hasPermission && _importStats.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Container(
@@ -188,6 +241,50 @@ class _MpesaImportCardState extends State<MpesaImportCard> {
         ),
       ),
     ).animate().fadeIn(duration: 600.ms).slideX(begin: 0.3, end: 0);
+  }
+
+  Widget _buildImportBanner() {
+    final pending = _importStats['pendingTransactions'] ?? 0;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, color: Colors.white, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'New M-Pesa SMS detected – Import now? ($pending pending)',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white,
+                  ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: _isImporting ? null : _importNow,
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white,
+            ),
+            child: _isImporting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text('Import now'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildLoadingCard() {
