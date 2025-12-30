@@ -307,40 +307,46 @@ class TransactionService {
     
     try {
       final now = DateTime.now();
-      final List<Map<String, dynamic>> monthlyTotals = [];
-      
-      // Calculate totals for each month
-      for (int i = 0; i < months; i++) {
-        final targetMonth = DateTime(now.year, now.month - i, 1);
-        final endDate = DateTime(targetMonth.year, targetMonth.month + 1, 0, 23, 59, 59);
-        
-        final snapshot = await _transactionsCollection
-            .where('userId', isEqualTo: _userId)
-            .where('date', isGreaterThanOrEqualTo: targetMonth)
-            .where('date', isLessThanOrEqualTo: endDate)
-            .get();
-            
-        final transactions = snapshot.docs.map((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          return models.Transaction.fromMap(data, id: doc.id);
-        }).toList();
-        
-        // Sum all transactions for the month
-        double total = 0;
-        for (final transaction in transactions) {
-          total += transaction.amount;
+      // Start from N-1 months ago so we include the current month as the last point.
+      final startMonth = DateTime(now.year, now.month - (months - 1), 1);
+      final endOfCurrentMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+
+      // Single range query for all transactions in the period
+      final snapshot = await _transactionsCollection
+          .where('userId', isEqualTo: _userId)
+          .where('date', isGreaterThanOrEqualTo: startMonth)
+          .where('date', isLessThanOrEqualTo: endOfCurrentMonth)
+          .get();
+
+      final transactions = snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return models.Transaction.fromMap(data, id: doc.id);
+      }).toList();
+
+      // Aggregate expenses per month
+      final Map<DateTime, double> monthlyTotals = {};
+      for (final tx in transactions) {
+        if (!(tx.isExpense || tx.amount < 0)) continue;
+
+        final monthKey = DateTime(tx.date.year, tx.date.month, 1);
+        if (monthKey.isBefore(startMonth) || monthKey.isAfter(endOfCurrentMonth)) {
+          continue;
         }
-        
-        monthlyTotals.add({
-          'month': targetMonth,
-          'total': total,
+
+        monthlyTotals[monthKey] = (monthlyTotals[monthKey] ?? 0) + tx.amount.abs();
+      }
+
+      // Build a continuous list of months from startMonth to current month
+      final List<Map<String, dynamic>> result = [];
+      for (int i = 0; i < months; i++) {
+        final monthDate = DateTime(startMonth.year, startMonth.month + i, 1);
+        result.add({
+          'month': monthDate,
+          'total': monthlyTotals[monthDate] ?? 0.0,
         });
       }
-      
-      // Sort by month (oldest first)
-      monthlyTotals.sort((a, b) => (a['month'] as DateTime).compareTo(b['month'] as DateTime));
-      
-      return monthlyTotals;
+
+      return result;
     } catch (e) {
       _logger.severe('Error getting monthly spending trend: $e');
       return [];
@@ -356,29 +362,37 @@ class TransactionService {
       return {};
     }
 
-    // Default to 12 months if not specified
-    final monthsToInclude = numberOfMonths ?? 12;
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month - (monthsToInclude - 1), 1);
-
     try {
-      var queryRef = _transactionsCollection.where('userId', isEqualTo: uid);
-      queryRef = queryRef.where('date', isGreaterThanOrEqualTo: start);
-      final query = await queryRef.get();
+      // Fetch all transactions for this user so we can compute the full
+      // spending history from the earliest to latest expense month.
+      final query = await _transactionsCollection
+          .where('userId', isEqualTo: uid)
+          .get();
 
-      // Pre-fill all months with 0.0 to ensure February and other months show up
-      final Map<String, double> totals = {}; 
-      for (int i = 0; i < monthsToInclude; i++) {
-        final monthDate = DateTime(start.year, start.month + i, 1);
-        totals[DateFormat('MMM yyyy').format(monthDate)] = 0.0;
+      if (query.docs.isEmpty) {
+        return {};
       }
 
-      // Process transactions and add to existing months
+      // First pass: compute totals by month (DateTime key) and track the
+      // earliest and latest months where we have any expense.
+      final Map<DateTime, double> monthlyTotals = {};
+      DateTime? earliestMonth;
+      DateTime? latestMonth;
+
       for (final doc in query.docs) {
         final data = doc.data() as Map<String, dynamic>;
-        final typeStr = data['type']?.toString() ?? '';
-        if (!typeStr.contains('expense')) continue; // only expenses
-        double amount = (data['amount'] as num).toDouble().abs();
+
+        // Determine if this transaction should be treated as an expense.
+        // Some older records may have inconsistent type strings, so we
+        // also fall back to checking the sign of the amount.
+        final typeStr = data['type']?.toString().toLowerCase() ?? '';
+        final rawAmount = (data['amount'] as num).toDouble();
+        final isExpenseByType = typeStr.contains('expense');
+        final isExpenseBySign = rawAmount < 0;
+
+        if (!(isExpenseByType || isExpenseBySign)) continue;
+
+        final double amount = rawAmount.abs();
 
         // Parse stored timestamp
         DateTime txDate;
@@ -386,21 +400,52 @@ class TransactionService {
         if (raw is Timestamp) {
           txDate = raw.toDate();
         } else if (raw is int) {
-          txDate = DateTime.fromMillisecondsSinceEpoch(raw > 1000000000000 ? raw : raw * 1000);
+          txDate = DateTime.fromMillisecondsSinceEpoch(
+              raw > 1000000000000 ? raw : raw * 1000);
         } else {
           txDate = DateTime.parse(raw.toString());
         }
 
-        final label = DateFormat('MMM yyyy').format(DateTime(txDate.year, txDate.month, 1));
-        if (totals.containsKey(label)) {
-          totals[label] = (totals[label] ?? 0) + amount;
+        final monthKey = DateTime(txDate.year, txDate.month, 1);
+        monthlyTotals[monthKey] = (monthlyTotals[monthKey] ?? 0) + amount;
+
+        if (earliestMonth == null || monthKey.isBefore(earliestMonth)) {
+          earliestMonth = monthKey;
+        }
+        if (latestMonth == null || monthKey.isAfter(latestMonth)) {
+          latestMonth = monthKey;
         }
       }
 
-      // Sort the keys chronologically and return
-      final sortedEntries = totals.entries.toList()
-        ..sort((a, b) => DateFormat('MMM yyyy').parse(a.key).compareTo(DateFormat('MMM yyyy').parse(b.key)));
-      return { for (var e in sortedEntries) e.key : e.value };
+      if (earliestMonth == null || latestMonth == null) {
+        return {};
+      }
+
+      // Build a continuous map from earliest to latest month, filling any
+      // missing months with 0.0 so the chart has a smooth x-axis.
+      final Map<String, double> totals = {};
+      final earliest = earliestMonth;
+      final latest = latestMonth;
+
+      var current = DateTime(earliest.year, earliest.month, 1);
+      while (!current.isAfter(latest)) {
+        final label = DateFormat('MMM yyyy').format(current);
+        totals[label] = monthlyTotals[current] ?? 0.0;
+        current = DateTime(current.year, current.month + 1, 1);
+      }
+
+      // If a specific numberOfMonths was requested, trim to the last N months.
+      if (numberOfMonths != null && totals.length > numberOfMonths) {
+        final keys = totals.keys.toList();
+        final startIndex = keys.length - numberOfMonths;
+        final trimmedEntries = keys
+            .sublist(startIndex)
+            .map((k) => MapEntry(k, totals[k]!))
+            .toList();
+        return {for (var e in trimmedEntries) e.key: e.value};
+      }
+
+      return totals;
     } catch (e) {
       _logger.severe('Error computing monthly spending history: $e');
       return {};
