@@ -290,29 +290,12 @@ class TransactionViewModel extends ChangeNotifier {
   /// Get the total expenses for the selected month
   double getTotalExpenses() {
     final targetMonth = _selectedMonth;
-    logger.info('getTotalExpenses: Target month is ${targetMonth.year}-${targetMonth.month}');
-    logger.info('getTotalExpenses: Total transactions loaded: ${_transactions.length}');
-    
-    // Log all transactions to see what we have
-    for (var t in _transactions) {
-      logger.info('Transaction: ${t.title} - \$${t.amount} - ${t.type} - ${t.date}');
-    }
-    
     final expenseTransactions = _transactions
         .where((t) => t.isExpense && 
                      t.date.year == targetMonth.year && 
                      t.date.month == targetMonth.month)
         .toList();
-    
-    logger.info('getTotalExpenses: Found ${expenseTransactions.length} expense transactions for January 2025');
-    
-    for (var t in expenseTransactions) {
-      logger.info('Expense: ${t.title} - \$${t.amount} on ${t.date}');
-    }
-    
     final total = expenseTransactions.fold(0.0, (total, t) => total + t.amount.abs());
-    logger.info('getTotalExpenses: Total expenses = \$$total');
-    
     return total;
   }
   

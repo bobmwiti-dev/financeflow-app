@@ -134,8 +134,8 @@ class FirestoreService {
       
       final querySnapshot = await _transactionsCollection
           .where('userId', isEqualTo: _userId)
-          .where('date', isGreaterThanOrEqualTo: startDate.toIso8601String())
-          .where('date', isLessThanOrEqualTo: endDate.toIso8601String())
+          .where('date', isGreaterThanOrEqualTo: startDate)
+          .where('date', isLessThanOrEqualTo: endDate)
           .orderBy('date', descending: true)
           .get();
       

@@ -1,15 +1,15 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 import '../../models/transaction_model.dart' as models;
-import '../../services/transaction_service.dart';
 import '../../themes/app_theme.dart';
 import '../../widgets/animated_buttons.dart';
 import '../../widgets/animated_transaction_item.dart';
 import 'add_transaction_screen.dart';
 import '../../utils/currency_extensions.dart';
+import '../../viewmodels/transaction_viewmodel_fixed.dart';
 
 class TransactionsScreen extends StatefulWidget {
   final String? category;
@@ -21,11 +21,10 @@ class TransactionsScreen extends StatefulWidget {
 }
 
 class _TransactionsScreenState extends State<TransactionsScreen> {
-  final TransactionService _transactionService = TransactionService.instance;
   List<models.Transaction> _transactions = [];
   List<models.Transaction> _filteredTransactions = [];
   bool _isLoading = true;
-  StreamSubscription<List<models.Transaction>>? _transactionSubscription;
+  VoidCallback? _viewModelListener;
   
   // Filter variables
   String _searchQuery = '';
@@ -45,7 +44,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     }
     
     // Load transactions
-    _loadTransactions();
+    final viewModel = Provider.of<TransactionViewModel>(context, listen: false);
+    _syncFromViewModel(viewModel);
+    _viewModelListener = () {
+      if (!mounted) return;
+      _syncFromViewModel(viewModel);
+    };
+    viewModel.addListener(_viewModelListener!);
   }
   
   // Helper method to show error messages without using BuildContext after async gaps
@@ -62,33 +67,19 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
   @override
   void dispose() {
-    _transactionSubscription?.cancel();
+    if (_viewModelListener != null) {
+      final viewModel = Provider.of<TransactionViewModel>(context, listen: false);
+      viewModel.removeListener(_viewModelListener!);
+    }
     super.dispose();
   }
   
-  Future<void> _loadTransactions() async {
+  void _syncFromViewModel(TransactionViewModel viewModel) {
     setState(() {
-      _isLoading = true;
+      _transactions = viewModel.transactions;
+      _isLoading = viewModel.isLoading;
+      _applyFilters();
     });
-    
-    try {
-      // Subscribe to real-time transaction updates
-      _transactionSubscription = _transactionService
-          .getTransactionsStream()
-          .listen((transactions) {
-        setState(() {
-          _transactions = transactions;
-          _applyFilters();
-          _isLoading = false;
-        });
-      });
-    } catch (e) {
-      // Use debugPrint instead of print for better logging
-      debugPrint('Error loading transactions: $e');
-      setState(() {
-        _isLoading = false;
-      });
-    }
   }
   
   void _applyFilters() {
@@ -370,7 +361,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                             transaction: transaction,
                           ),
                         ),
-                      ).then((_) => _loadTransactions());
+                      );
                     },
                     icon: const Icon(Icons.edit),
                     label: const Text('Edit'),
@@ -381,6 +372,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   OutlinedButton.icon(
                     onPressed: () async {
                       // Delete transaction
+                      // Capture view model before async gap to avoid using BuildContext later
+                      final viewModel = Provider.of<TransactionViewModel>(context, listen: false);
                       final confirm = await showDialog<bool>(
                         context: context,
                         builder: (context) => AlertDialog(
@@ -409,13 +402,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                         // Perform the async operation
                         if (transaction.firestoreId != null) {
                           try {
-                            // Do the async work without using BuildContext
-                            await _transactionService.deleteTransaction(transaction.firestoreId!);
-                            
-                            // Only reload data if widget is still mounted
-                            if (mounted) {
-                              _loadTransactions();
-                            }
+                            // Delete via TransactionViewModel; its stream will update the list
+                            await viewModel.deleteTransaction(transaction.firestoreId!);
                           } catch (e) {
                             // Show error without using BuildContext after async gap
                             if (mounted) {
@@ -581,11 +569,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 initialCategory: _selectedCategory,
               ),
             ),
-          ).then((result) {
-            if (result == true) {
-              _loadTransactions();
-            }
-          });
+          );
         },
         icon: Icons.add,
         tooltip: 'Add Transaction',

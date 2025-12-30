@@ -56,6 +56,7 @@ class TransactionService {
     // Changed query to avoid needing composite index
     // Just get all transactions and sort in memory for testing
     return _transactionsCollection
+        .where('userId', isEqualTo: _userId)
         .snapshots()
         .map((snapshot) {
           try {
@@ -158,6 +159,7 @@ class TransactionService {
     
     try {
       final snapshot = await _transactionsCollection
+          .where('userId', isEqualTo: _userId)
           .orderBy('date', descending: true)
           .limit(limit)
           .get();
@@ -236,6 +238,7 @@ class TransactionService {
     
     try {
       final snapshot = await _transactionsCollection
+          .where('userId', isEqualTo: _userId)
           .where('category', isEqualTo: category)
           .where('date', isGreaterThanOrEqualTo: startDate)
           .where('date', isLessThanOrEqualTo: endDate)
@@ -265,6 +268,7 @@ class TransactionService {
       final endDate = DateTime(month.year, month.month + 1, 0, 23, 59, 59);
       
       final snapshot = await _transactionsCollection
+          .where('userId', isEqualTo: _userId)
           .where('date', isGreaterThanOrEqualTo: startDate)
           .where('date', isLessThanOrEqualTo: endDate)
           .get();
@@ -311,6 +315,7 @@ class TransactionService {
         final endDate = DateTime(targetMonth.year, targetMonth.month + 1, 0, 23, 59, 59);
         
         final snapshot = await _transactionsCollection
+            .where('userId', isEqualTo: _userId)
             .where('date', isGreaterThanOrEqualTo: targetMonth)
             .where('date', isLessThanOrEqualTo: endDate)
             .get();
@@ -415,6 +420,7 @@ class TransactionService {
       final endDate = DateTime(month.year, month.month + 1, 0, 23, 59, 59);
       
       final snapshot = await _transactionsCollection
+          .where('userId', isEqualTo: _userId)
           .where('date', isGreaterThanOrEqualTo: startDate)
           .where('date', isLessThanOrEqualTo: endDate)
           .where('amount', isGreaterThan: 0)
@@ -451,6 +457,7 @@ class TransactionService {
       final endDate = DateTime(month.year, month.month + 1, 0, 23, 59, 59);
       
       final snapshot = await _transactionsCollection
+          .where('userId', isEqualTo: _userId)
           .where('date', isGreaterThanOrEqualTo: startDate)
           .where('date', isLessThanOrEqualTo: endDate)
           .where('amount', isLessThan: 0)
@@ -483,7 +490,11 @@ class TransactionService {
 
     try {
       // Fetch all transactions, consider limiting if performance becomes an issue
-      final snapshot = await _transactionsCollection.orderBy('date', descending: true).get();
+      final snapshot = await _transactionsCollection
+          .where('userId', isEqualTo: _userId)
+          .orderBy('date', descending: true)
+          .limit(500)
+          .get();
       if (snapshot.docs.isEmpty) {
         _logger.info('No transactions found, returning empty list of payees.');
         return [];

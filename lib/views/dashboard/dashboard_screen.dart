@@ -39,6 +39,7 @@ import 'package:financeflow_app/viewmodels/debt_goals_viewmodel.dart';
 import 'package:financeflow_app/viewmodels/account_viewmodel.dart';
 import 'widgets/enhanced_safe_to_spend_card.dart';
 import '../../widgets/account_balance_widget.dart';
+import 'package:financeflow_app/viewmodels/transaction_viewmodel_fixed.dart';
 
 /// Dashboard screen showing financial overview, recent transactions, and quick actions
 class DashboardScreen extends StatefulWidget {
@@ -60,8 +61,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _isLoading = true;
   bool _isError = false;
   
-  // Stream subscription management
-  StreamSubscription<List<models.Transaction>>? _transactionSubscription;
+  // Listen to transaction updates from TransactionViewModel
+  TransactionViewModel? _transactionViewModel;
+  VoidCallback? _txViewModelListener;
   
   // Dashboard data
   double _expenses = 0.0;
@@ -93,13 +95,19 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     // Initialize services and viewmodels
     _transactionService = Provider.of<TransactionService>(context, listen: false);
     _incomeViewModel = Provider.of<IncomeViewModel>(context, listen: false);
+    _transactionViewModel = Provider.of<TransactionViewModel>(context, listen: false);
     
     // Listen to income changes and refresh dashboard data
     _incomeViewModel.addListener(_onIncomeChanged);
+    // Listen to transaction changes via TransactionViewModel
+    _txViewModelListener = () {
+      if (!mounted) return;
+      _onTransactionsUpdated();
+    };
+    _transactionViewModel?.addListener(_txViewModelListener!);
     
-    // Load initial data and set up real-time listeners
+    // Load initial data
     _loadInitialData();
-    _setupTransactionListener();
     
     // Start entrance animation
     _animationController.forward();
@@ -110,7 +118,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   @override
   void dispose() {
     _incomeViewModel.removeListener(_onIncomeChanged);
-    _transactionSubscription?.cancel();
+    if (_txViewModelListener != null && _transactionViewModel != null) {
+      _transactionViewModel!.removeListener(_txViewModelListener!);
+    }
     super.dispose();
   }
 
@@ -120,54 +130,43 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (mounted) {
       // Recalculate real balance with new income
       final accountVm = Provider.of<AccountViewModel>(context, listen: false);
-      final transactionService = Provider.of<TransactionService>(context, listen: false);
-      
-      // Get current transactions for balance calculation
+      final vm = _transactionViewModel ?? Provider.of<TransactionViewModel>(context, listen: false);
+
+      // Get current month transactions from the view model
       final now = DateTime.now();
       final currentMonth = DateTime(now.year, now.month);
-      transactionService.getTransactionsByMonth(currentMonth).first.then((transactions) {
+      final monthTransactions = vm.transactions.where((t) =>
+        t.date.year == currentMonth.year && t.date.month == currentMonth.month,
+      ).toList();
+
+      final realBalance = accountVm.getTotalBalance(
+        monthTransactions,
+        _incomeViewModel.incomeSources,
+      );
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          final realBalance = accountVm.getTotalBalance(
-            transactions,
-            _incomeViewModel.incomeSources,
-          );
-          
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              setState(() {
-                _balance = realBalance;
-              });
-            }
+          setState(() {
+            _balance = realBalance;
           });
         }
       });
     }
   }
 
-  void _setupTransactionListener() {
-    // Cancel existing subscription if any
-    _transactionSubscription?.cancel();
-    
-    // Get current month for filtering
+  void _onTransactionsUpdated() {
+    final vm = _transactionViewModel;
+    if (vm == null) return;
+
+    // Filter transactions for the currently selected month index
     final now = DateTime.now();
     final currentMonth = DateTime(now.year, _selectedMonthIndex + 1);
-    
-    // Set up the transaction stream listener
-    _transactionSubscription = _transactionService.getTransactionsByMonth(currentMonth)
-        .listen((transactions) async {
-          if (!mounted) return;
-          
-          logger.info('Processing ${transactions.length} transactions for dashboard');
-          
-          await _processTransactions(transactions);
-        }, onError: (error) {
-          if (!mounted) return;
-          logger.severe('Error in transaction stream: $error');
-          setState(() {
-            _isError = true;
-            _isLoading = false;
-          });
-        });
+    final monthTransactions = vm.transactions.where((t) =>
+      t.date.year == currentMonth.year && t.date.month == currentMonth.month,
+    ).toList();
+
+    logger.info('Processing ${monthTransactions.length} transactions for dashboard (from TransactionViewModel)');
+    _processTransactions(monthTransactions);
   }
 
   /// Load initial dashboard data (called once in initState)
@@ -203,30 +202,36 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       }
       
       logger.info('Loading dashboard data for user: ${user.uid}');
-
-      // Fetch frequent payees (once per load/refresh)
-      logger.info('Fetching frequent payees');
-      final fetchedPayees = await _transactionService.getFrequentPayees(limit: 3);
-      if (mounted) {
-        setState(() {
-          _frequentPayees = fetchedPayees;
-        });
-        logger.info('Loaded ${fetchedPayees.length} frequent payees');
-      }
-
-      // Get current month for filtering
-      final now = DateTime.now();
-      final currentMonth = DateTime(now.year, _selectedMonthIndex + 1);
-      logger.info('Loading data for month: ${DateFormat.yMMMM().format(currentMonth)}');
-
-      // Load previous month data for trends
-      await _loadPreviousMonthData(currentMonth);
+      // At this point, the transaction stream listener will start delivering
+      // current-month data via _setupTransactionListener. Do not block the
+      // initial render on heavier background analytics.
 
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
       }
+
+      // Kick off heavier work in the background without blocking UI.
+      // Fetch frequent payees
+      () async {
+        logger.info('Fetching frequent payees in background');
+        final fetchedPayees = await _transactionService.getFrequentPayees(limit: 3);
+        if (mounted) {
+          setState(() {
+            _frequentPayees = fetchedPayees;
+          });
+          logger.info('Loaded ${fetchedPayees.length} frequent payees');
+        }
+      }();
+
+      // Load previous month data for trends in the background
+      () async {
+        final now = DateTime.now();
+        final currentMonth = DateTime(now.year, _selectedMonthIndex + 1);
+        logger.info('Background load of historical data for ${DateFormat.yMMMM().format(currentMonth)}');
+        await _loadPreviousMonthData(currentMonth);
+      }();
     } catch (e) {
       if (!mounted) return;
       logger.severe('Error loading initial dashboard data: $e');
@@ -696,8 +701,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   final now = DateTime.now();
                   final currentMonth = DateTime(now.year, index + 1);
                   _loadPreviousMonthData(currentMonth);
-                  // Set up new transaction listener for the selected month
-                  _setupTransactionListener();
+                  // Recompute dashboard metrics for the newly selected month
+                  _onTransactionsUpdated();
                 }
               },
               backgroundColor: Colors.grey.withValues(alpha: 0.1 * 255),
