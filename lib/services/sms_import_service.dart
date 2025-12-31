@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'transaction_service.dart';
 import 'sms_parser_service.dart';
 import '../models/transaction_model.dart' as models;
+import 'merchant_rule_service.dart';
 
 /// Service to handle importing SMS transactions into the app database
 class SmsImportService extends ChangeNotifier {
@@ -53,8 +55,8 @@ class SmsImportService extends ChangeNotifier {
   }
   
   /// Import transactions from SMS messages
-  Future<int> importTransactions() async {
-    if (!_hasPermission) {
+  Future<int> importTransactions({bool ensurePermission = true}) async {
+    if (ensurePermission && !_hasPermission) {
       final granted = await requestPermission();
       if (!granted) {
         throw Exception('SMS permission not granted');
@@ -85,7 +87,13 @@ class SmsImportService extends ChangeNotifier {
       
       // Save unique transactions to database
       for (final transaction in uniqueTransactions) {
-        await TransactionService.instance.addTransaction(transaction);
+        final learnedCategory = await MerchantRuleService.instance
+            .findCategoryForText('${transaction.title} ${transaction.description ?? ''}');
+        final txToSave = learnedCategory != null && learnedCategory.isNotEmpty
+            ? transaction.copyWith(category: learnedCategory)
+            : transaction;
+
+        await TransactionService.instance.addTransaction(txToSave);
         _importedCount++;
       }
       
@@ -97,6 +105,43 @@ class SmsImportService extends ChangeNotifier {
       _errorMessage = 'Failed to import transactions: $e';
       notifyListeners();
       rethrow;
+    }
+  }
+
+  /// Automatically import bank SMS transactions if enough time has passed
+  /// since the last import. This is intended for background or on-start
+  /// usage and will not request SMS permissions by itself.
+  Future<int?> autoImportIfNeeded({
+    Duration minInterval = const Duration(hours: 24),
+  }) async {
+    try {
+      // Only proceed if SMS permission is already granted
+      final permissionGranted = await _smsParserService.checkSmsPermission();
+      if (!permissionGranted) {
+        return null;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      const key = 'last_bank_sms_import';
+
+      final now = DateTime.now();
+      final lastMillis = prefs.getInt(key);
+      if (lastMillis != null) {
+        final lastImport = DateTime.fromMillisecondsSinceEpoch(lastMillis);
+        if (now.difference(lastImport) < minInterval) {
+          return null;
+        }
+      }
+
+      // Mark permission as granted so importTransactions won't prompt
+      _hasPermission = true;
+
+      final imported = await importTransactions(ensurePermission: false);
+
+      await prefs.setInt(key, now.millisecondsSinceEpoch);
+      return imported;
+    } catch (_) {
+      return null;
     }
   }
   

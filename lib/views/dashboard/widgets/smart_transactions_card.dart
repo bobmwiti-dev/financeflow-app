@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 import '../../../models/transaction_model.dart';
 import '../../../utils/category_icons.dart';
 import '../../../utils/kenya_merchant_recognition.dart';
+import '../../../services/merchant_rule_service.dart';
+import '../../../constants/app_constants.dart';
 import '../../../viewmodels/transaction_viewmodel_fixed.dart' as fixed;
 
 /// Recent Transactions card displaying user's transaction history
@@ -48,6 +50,92 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
     );
     _slideController.forward();
     _pulseController.repeat(reverse: true);
+  }
+
+  Future<void> _toggleBusiness(Transaction transaction) async {
+    final vm = Provider.of<fixed.TransactionViewModel>(context, listen: false);
+    final updated = transaction.copyWith(isBusiness: !transaction.isBusiness);
+    await vm.updateTransaction(updated);
+  }
+
+  Future<void> _showChangeCategorySheet(Transaction transaction) async {
+    final vm = Provider.of<fixed.TransactionViewModel>(context, listen: false);
+
+    final existing = vm.transactions.map((t) => t.category).toSet().toList()..sort();
+    final suggestions = <String>{
+      ...existing,
+      ...AppConstants.expenseCategories,
+      ...AppConstants.incomeCategories,
+    }.toList();
+    suggestions.sort();
+
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return SafeArea(
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.65,
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Change category',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: suggestions.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, idx) {
+                      final cat = suggestions[idx];
+                      return ListTile(
+                        title: Text(cat),
+                        trailing: cat == transaction.category
+                            ? const Icon(Icons.check, color: Colors.green)
+                            : null,
+                        onTap: () => Navigator.pop(context, cat),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (selected == null || selected.isEmpty || selected == transaction.category) {
+      return;
+    }
+
+    final updated = transaction.copyWith(category: selected);
+    await vm.updateTransaction(updated);
+
+    final merchantKey = transaction.description?.isNotEmpty == true
+        ? transaction.description!
+        : transaction.title;
+    await MerchantRuleService.instance.setCategoryRule(
+      merchantKey: merchantKey,
+      category: selected,
+    );
   }
 
   @override
@@ -372,6 +460,40 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
                     ),
                   ),
                   const SizedBox(width: 16),
+                  PopupMenuButton<String>(
+                    tooltip: 'Quick actions',
+                    onSelected: (value) async {
+                      if (value == 'category') {
+                        await _showChangeCategorySheet(transaction);
+                      }
+                      if (value == 'business') {
+                        await _toggleBusiness(transaction);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'category',
+                        child: Text('Change category'),
+                      ),
+                      PopupMenuItem(
+                        value: 'business',
+                        child: Text(
+                          transaction.isBusiness
+                              ? 'Mark as Personal'
+                              : 'Mark as Business',
+                        ),
+                      ),
+                    ],
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.more_vert, size: 18),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.end,

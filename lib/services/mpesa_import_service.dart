@@ -8,6 +8,7 @@ import '../models/mpesa_sms_model.dart';
 import 'sms_reader_service.dart';
 import 'mpesa_sms_parser.dart';
 import 'firestore_service.dart';
+import 'merchant_rule_service.dart';
 
 /// Service for importing M-Pesa transactions from SMS
 class MpesaImportService {
@@ -178,8 +179,10 @@ class MpesaImportService {
         
         // Auto-categorize if enabled
         if (categorizeAutomatically) {
-          String? suggestedCategory = MpesaSmsParser.suggestCategory(mpesaTransaction);
-          if (suggestedCategory != null) {
+          final merchantText = mpesaTransaction.recipient ?? mpesaTransaction.description;
+          final learnedCategory = await MerchantRuleService.instance.findCategoryForText(merchantText);
+          final String? suggestedCategory = learnedCategory ?? MpesaSmsParser.suggestCategory(mpesaTransaction);
+          if (suggestedCategory != null && suggestedCategory.isNotEmpty) {
             transaction = transaction.copyWith(category: suggestedCategory);
           }
         }
