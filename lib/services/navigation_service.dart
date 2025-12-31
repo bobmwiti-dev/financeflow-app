@@ -18,6 +18,7 @@ import 'package:financeflow_app/views/add_transaction/add_transaction_screen.dar
 import 'package:financeflow_app/views/insights/spending_heatmap_screen.dart';
 import 'package:financeflow_app/views/bills/add_bill_screen.dart';
 import 'package:financeflow_app/views/notifications/notification_test_screen.dart';
+import 'package:financeflow_app/views/transactions/transactions_screen.dart';
 import 'package:financeflow_app/widgets/currency_selector.dart';
 import 'package:financeflow_app/views/budgets/add_budget_screen.dart';
 import 'package:financeflow_app/views/goals/add_goal_screen.dart';
@@ -30,6 +31,9 @@ import 'package:financeflow_app/views/onboarding/account_setup_screen.dart';
 import 'package:financeflow_app/views/onboarding/splash_screen.dart';
 import 'package:financeflow_app/views/onboarding/onboarding_screen.dart';
 import 'package:financeflow_app/views/accounts/account_management_screen.dart';
+import 'package:financeflow_app/views/onboarding/quick_setup_wizard_screen.dart';
+import 'package:financeflow_app/views/onboarding/first_30_days_snapshot_screen.dart';
+import 'package:financeflow_app/views/reports/side_hustle_report_screen.dart';
 
 class NavigationService {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -176,6 +180,21 @@ class NavigationService {
         return MaterialPageRoute(builder: (_) => const SignInScreen());
       case '/add_transaction':
         return MaterialPageRoute(builder: (_) => const AddTransactionScreen());
+      case '/transactions':
+        return MaterialPageRoute(
+          builder: (_) => const TransactionsScreen(),
+          settings: settings,
+        );
+      case '/quick_setup':
+        return MaterialPageRoute(builder: (_) => const QuickSetupWizardScreen());
+      case '/first_30_days_snapshot':
+        return MaterialPageRoute(builder: (_) => const First30DaysSnapshotScreen());
+      case '/side_hustle_report':
+        final args = settings.arguments;
+        final initialYear = args is int ? args : null;
+        return MaterialPageRoute(
+          builder: (_) => SideHustleReportScreen(initialYear: initialYear),
+        );
       default:
         return MaterialPageRoute(
           builder: (context) => Scaffold(

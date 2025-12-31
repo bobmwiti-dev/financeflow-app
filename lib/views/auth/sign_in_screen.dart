@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../themes/app_theme.dart';
 import '../../utils/enhanced_animations.dart';
@@ -62,8 +63,12 @@ class _SignInScreenState extends State<SignInScreen> {
         }
         
         if (mounted && !_isTestMode) {
-          // Navigate to dashboard on success
-          Navigator.pushReplacementNamed(context, '/dashboard');
+          final navigator = Navigator.of(context);
+          final prefs = await SharedPreferences.getInstance();
+          final quickSetupCompleted = prefs.getBool('quick_setup_completed') ?? false;
+          navigator.pushReplacementNamed(
+            quickSetupCompleted ? '/dashboard' : '/quick_setup',
+          );
         }
       } on FirebaseAuthException catch (e) {
         // Handle specific Firebase Auth errors with user-friendly messages
