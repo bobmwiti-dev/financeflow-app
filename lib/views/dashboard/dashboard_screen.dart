@@ -6,11 +6,13 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:logging/logging.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Services
 import '../../services/transaction_service.dart';
 import '../../services/realtime_data_service.dart';
 import '../../services/mpesa_import_service.dart';
+import '../../services/sms_import_service.dart';
 
 // Models
 import '../../models/transaction_model.dart' as models;
@@ -21,6 +23,7 @@ import 'package:financeflow_app/views/dashboard/widgets/financial_summary_card.d
 import 'package:financeflow_app/views/dashboard/widgets/spending_trend_chart.dart';
 import './widgets/insight_of_the_day_card.dart';
 import './widgets/smart_transactions_card.dart';
+import 'widgets/side_hustle_summary_card.dart';
 import './widgets/enhanced_bills_card.dart';
 import './widgets/unified_savings_card.dart';
 import 'widgets/enhanced_emergency_fund_card.dart';
@@ -84,6 +87,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
   List<String> _frequentPayees = [];
+  int _recentBankSmsImported = 0;
 
   @override
   void initState() {
@@ -97,6 +101,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     _transactionService = Provider.of<TransactionService>(context, listen: false);
     _incomeViewModel = Provider.of<IncomeViewModel>(context, listen: false);
     _transactionViewModel = Provider.of<TransactionViewModel>(context, listen: false);
+    final smsImportService = Provider.of<SmsImportService>(context, listen: false);
     
     // Listen to income changes and refresh dashboard data
     _incomeViewModel.addListener(_onIncomeChanged);
@@ -110,15 +115,48 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     // Load initial data
     _loadInitialData();
     
-    // Attempt automatic M-Pesa import once per day (non-blocking)
+    // Attempt automatic imports once per day (non-blocking)
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _maybeRunFirstTimeFlows();
+
       await MpesaImportService.autoImportIfNeeded(
         minInterval: const Duration(hours: 24),
       );
+
+      // Bank SMS (KCB, Equity, etc.) via SmsImportService
+      final imported = await smsImportService.autoImportIfNeeded(
+        minInterval: const Duration(hours: 24),
+      );
+      if (mounted && (imported ?? 0) > 0) {
+        setState(() {
+          _recentBankSmsImported = imported!;
+        });
+      }
     });
     
     // Start entrance animation
     _animationController.forward();
+  }
+
+  Future<void> _maybeRunFirstTimeFlows() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final quickSetupCompleted = prefs.getBool('quick_setup_completed') ?? false;
+
+      if (!quickSetupCompleted) {
+        if (!mounted) return;
+        Navigator.of(context).pushReplacementNamed('/quick_setup');
+        return;
+      }
+
+      final snapshotShown = prefs.getBool('first_30_snapshot_shown') ?? false;
+      if (!snapshotShown) {
+        if (!mounted) return;
+        Navigator.of(context).pushNamed('/first_30_days_snapshot');
+      }
+    } catch (_) {
+      // no-op
+    }
   }
 
 
@@ -479,6 +517,39 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
+  Widget _buildBankSmsImportBanner() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.shade100),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.sms, color: Colors.blue, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Imported $_recentBankSmsImported new bank SMS transactions today',
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 18),
+            color: Colors.grey.shade600,
+            onPressed: () {
+              setState(() {
+                _recentBankSmsImported = 0;
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBody(BuildContext context) {
     if (_isLoading) {
       return const Center(
@@ -552,30 +623,65 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             _buildMonthSelector(),
             const SizedBox(height: 12),
             _buildUserGreeting(),
-            
-            // Account Balance Widget
-            const AccountBalanceWidget(
-              showAllAccounts: false, // Show only default account on dashboard
-            ).animate().fadeIn(delay: 25.ms, duration: 400.ms),
-            const SizedBox(height: 16),
-            
-            InsightOfTheDayCard(selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1)),
-            const SizedBox(height: 8),
-            
-            const SizedBox(height: 16),
-            // Enhanced Safe-to-Spend Card
-            EnhancedSafeToSpendCard(
+            if (_recentBankSmsImported > 0) ...[
+              const SizedBox(height: 8),
+              _buildBankSmsImportBanner(),
+            ],
+
+            // This month at a glance
+            EnhancedMonthlySummary(
               selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1),
             ).animate().fadeIn(delay: 50.ms, duration: 400.ms),
             const SizedBox(height: 16),
-            // M-Pesa Import Card
-            const MpesaImportCard().animate().fadeIn(delay: 75.ms, duration: 400.ms),
-            const SizedBox(height: 16), // Reduced spacing
-            // Financial summary showing income, expenses, and balance
-            EnhancedMonthlySummary(
+
+            // Safe-to-spend + cash flow forecast
+            EnhancedSafeToSpendCard(
               selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1),
+            ).animate().fadeIn(delay: 75.ms, duration: 400.ms),
+            const SizedBox(height: 16),
+            EnhancedCashFlowForecastCard(
+              onViewDetails: () => Navigator.pushNamed(context, '/cash_flow_forecast'),
             ).animate().fadeIn(delay: 100.ms, duration: 400.ms),
-            const SizedBox(height: 16), // Reduced spacing
+            const SizedBox(height: 16),
+
+            // Next upcoming debits
+            const EnhancedBillsCard(),
+            const SizedBox(height: 16),
+
+            // Goals & emergency fund
+            Consumer<IncomeViewModel>(
+              builder: (context, incomeViewModel, child) {
+                return UnifiedSavingsCard(
+                  income: incomeViewModel.getTotalIncome(),
+                  expenses: _expenses,
+                  targetSavingsRate: 0.30,
+                  onViewAllGoals: () => Navigator.pushNamed(context, '/goals'),
+                  onGoalTap: (goal) => Navigator.pushNamed(context, '/goal_details', arguments: goal),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            const EnhancedEmergencyFundCard().animate().fadeIn(delay: 150.ms, duration: 400.ms),
+            const SizedBox(height: 16),
+
+            // Side-hustle (Business) Summary
+            SideHustleSummaryCard(
+              selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1),
+            ).animate().fadeIn(delay: 175.ms, duration: 400.ms),
+            const SizedBox(height: 16),
+
+            // Account Balance Widget
+            const AccountBalanceWidget(
+              showAllAccounts: false, // Show only default account on dashboard
+            ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
+            const SizedBox(height: 16),
+
+            InsightOfTheDayCard(selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1)),
+            const SizedBox(height: 8),
+
+            // M-Pesa Import Card
+            const MpesaImportCard().animate().fadeIn(delay: 225.ms, duration: 400.ms),
+            const SizedBox(height: 16),
             // Financial summary card with chart visualization
             Consumer<IncomeViewModel>(
               builder: (context, incomeViewModel, child) {
@@ -593,25 +699,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ).animate().fadeIn(delay: 200.ms, duration: 400.ms);
               },
             ),
-            // Enhanced Bills & Subscriptions with urgency indicators
-            const EnhancedBillsCard(),
-            const SizedBox(height: 16), // Reduced spacing
             // Recent Transactions
             RecentTransactionsCard(selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1)),
-            const SizedBox(height: 16), // Reduced spacing
-            // Unified Savings Card combining rate and goals
-            Consumer<IncomeViewModel>(
-              builder: (context, incomeViewModel, child) {
-                return UnifiedSavingsCard(
-                  income: incomeViewModel.getTotalIncome(),
-                  expenses: _expenses,
-                  targetSavingsRate: 0.30,
-                  onViewAllGoals: () => Navigator.pushNamed(context, '/goals'),
-                  onGoalTap: (goal) => Navigator.pushNamed(context, '/goal_details', arguments: goal),
-                );
-              },
-            ),
-            const SizedBox(height: 16), // Reduced spacing
+            const SizedBox(height: 16),
             
             // Quick action buttons
             QuickActionsPanel(
@@ -656,11 +746,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ).animate().fadeIn(delay: 400.ms, duration: 400.ms), // Keep existing item animation
             const SizedBox(height: 24),
             
-            // Enhanced Emergency Fund Card
-            const EnhancedEmergencyFundCard().animate().fadeIn(delay: 620.ms, duration: 500.ms),
-            const SizedBox(height: 24),
-            
-            
             // Smart Alerts Card
             const SmartAlertsCard().animate().fadeIn(delay: 700.ms, duration: 500.ms),
             const SizedBox(height: 24),
@@ -672,11 +757,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             const SpendingTrendChart().animate().fadeIn(delay: 620.ms, duration: 500.ms),
             // Spending by category moved to Financial Summary card
             const SizedBox(height: 24),
-            // Enhanced Cash Flow Forecast
-            EnhancedCashFlowForecastCard(
-              onViewDetails: () => Navigator.pushNamed(context, '/cash_flow_forecast'),
-            ).animate().fadeIn(delay: 820.ms, duration: 500.ms),
-            const SizedBox(height: 16),
+            
             const SizedBox(height: 70), // Space for FAB
           ],
         ),
