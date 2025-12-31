@@ -33,6 +33,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   String? _selectedCategory;
   bool _showIncomeOnly = false;
   bool _showExpensesOnly = false;
+  bool _showBusinessOnly = false;
+  bool _showPersonalOnly = false;
   
   @override
   void initState() {
@@ -42,6 +44,27 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     if (widget.category != null) {
       _selectedCategory = widget.category;
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is Map) {
+        final DateTime? startDate = args['startDate'] is DateTime ? args['startDate'] as DateTime : null;
+        final DateTime? endDate = args['endDate'] is DateTime ? args['endDate'] as DateTime : null;
+        final bool businessOnly = args['businessOnly'] is bool ? args['businessOnly'] as bool : false;
+        final bool personalOnly = args['personalOnly'] is bool ? args['personalOnly'] as bool : false;
+
+        setState(() {
+          _startDate = startDate;
+          _endDate = endDate;
+          _showBusinessOnly = businessOnly;
+          _showPersonalOnly = personalOnly && !businessOnly;
+        });
+
+        _applyFilters();
+      }
+    });
     
     // Load transactions
     final viewModel = Provider.of<TransactionViewModel>(context, listen: false);
@@ -126,6 +149,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       filtered = filtered.where((transaction) {
         return transaction.amount < 0;
       }).toList();
+    }
+
+    // Apply business vs personal context filter
+    if (_showBusinessOnly) {
+      filtered = filtered.where((transaction) => transaction.isBusiness).toList();
+    } else if (_showPersonalOnly) {
+      filtered = filtered.where((transaction) => !transaction.isBusiness).toList();
     }
     
     setState(() {
@@ -267,6 +297,45 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Context',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CheckboxListTile(
+                          title: const Text('Business only'),
+                          value: _showBusinessOnly,
+                          onChanged: (value) {
+                            setModalState(() {
+                              _showBusinessOnly = value ?? false;
+                              if (_showBusinessOnly) {
+                                _showPersonalOnly = false;
+                              }
+                            });
+                          },
+                        ),
+                      ),
+                      Expanded(
+                        child: CheckboxListTile(
+                          title: const Text('Personal only'),
+                          value: _showPersonalOnly,
+                          onChanged: (value) {
+                            setModalState(() {
+                              _showPersonalOnly = value ?? false;
+                              if (_showPersonalOnly) {
+                                _showBusinessOnly = false;
+                              }
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 20),
                   
                   // Action buttons
@@ -281,6 +350,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                             _selectedCategory = widget.category;
                             _showIncomeOnly = false;
                             _showExpensesOnly = false;
+                            _showBusinessOnly = false;
+                            _showPersonalOnly = false;
                           });
                         },
                         style: ElevatedButton.styleFrom(

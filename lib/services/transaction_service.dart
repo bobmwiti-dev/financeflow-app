@@ -579,7 +579,87 @@ class TransactionService {
   }
 
 
-   
+  /// Get year-to-date summary for business / side-hustle transactions.
+  /// Returns a map with keys: 'income', 'expenses', 'net'.
+  Future<Map<String, double>> getBusinessSummaryForYear(int year) async {
+    if (_userId == null) {
+      _logger.warning('No authenticated user found, cannot compute business summary.');
+      return const {'income': 0.0, 'expenses': 0.0, 'net': 0.0};
+    }
+
+    try {
+      final startDate = DateTime(year, 1, 1);
+      final endDate = DateTime(year, 12, 31, 23, 59, 59);
+
+      final snapshot = await _transactionsCollection
+          .where('userId', isEqualTo: _userId)
+          .where('isBusiness', isEqualTo: true)
+          .where('date', isGreaterThanOrEqualTo: startDate)
+          .where('date', isLessThanOrEqualTo: endDate)
+          .get();
+
+      double income = 0.0;
+      double expenses = 0.0;
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final tx = models.Transaction.fromMap(data, id: doc.id);
+        if (tx.amount > 0 || tx.type == models.TransactionType.income) {
+          income += tx.amount.abs();
+        } else if (tx.amount < 0 || tx.type == models.TransactionType.expense) {
+          expenses += tx.amount.abs();
+        }
+      }
+
+      final net = income - expenses;
+      return {'income': income, 'expenses': expenses, 'net': net};
+    } catch (e) {
+      _logger.severe('Error computing business summary for $year: $e');
+      return const {'income': 0.0, 'expenses': 0.0, 'net': 0.0};
+    }
+  }
+
+  /// Get monthly breakdown for business / side-hustle transactions for a given year.
+  /// Returns a map keyed by month number (1-12), each containing {income, expenses}.
+  Future<Map<int, Map<String, double>>> getBusinessMonthlySummary(int year) async {
+    if (_userId == null) {
+      _logger.warning('No authenticated user found, cannot compute business monthly summary.');
+      return {};
+    }
+
+    try {
+      final startDate = DateTime(year, 1, 1);
+      final endDate = DateTime(year, 12, 31, 23, 59, 59);
+
+      final snapshot = await _transactionsCollection
+          .where('userId', isEqualTo: _userId)
+          .where('isBusiness', isEqualTo: true)
+          .where('date', isGreaterThanOrEqualTo: startDate)
+          .where('date', isLessThanOrEqualTo: endDate)
+          .get();
+
+      final result = <int, Map<String, double>>{
+        for (int m = 1; m <= 12; m++) m: {'income': 0.0, 'expenses': 0.0},
+      };
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final tx = models.Transaction.fromMap(data, id: doc.id);
+        final month = tx.date.month;
+
+        if (tx.amount > 0 || tx.type == models.TransactionType.income) {
+          result[month]!['income'] = (result[month]!['income'] ?? 0.0) + tx.amount.abs();
+        } else if (tx.amount < 0 || tx.type == models.TransactionType.expense) {
+          result[month]!['expenses'] = (result[month]!['expenses'] ?? 0.0) + tx.amount.abs();
+        }
+      }
+
+      return result;
+    } catch (e) {
+      _logger.severe('Error computing business monthly summary for $year: $e');
+      return {};
+    }
+  }
 
 
   Future<List<models.Transaction>> getUpcomingBills({int limit = 5}) async {

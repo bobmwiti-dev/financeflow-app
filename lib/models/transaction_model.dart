@@ -36,6 +36,7 @@ class TransactionModel {
   final TransactionStatus status;
   final double? paidAmount;
   final bool isCarriedForward;
+  final bool isBusiness;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -57,6 +58,7 @@ class TransactionModel {
     this.status = TransactionStatus.pending,
     double? paidAmount,
     this.isCarriedForward = false,
+    this.isBusiness = false,
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : id = id ?? _uuid.v4(),
@@ -83,6 +85,7 @@ class TransactionModel {
       'status': status.toString(),
       'paidAmount': paidAmount,
       'isCarriedForward': isCarriedForward,
+      'isBusiness': isBusiness,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -122,6 +125,7 @@ class TransactionModel {
           : _transactionStatusFromString(map['status']?.toString()),
       paidAmount: (map['paidAmount'] as num?)?.toDouble(),
       isCarriedForward: map['isCarriedForward'] as bool? ?? false,
+      isBusiness: map['isBusiness'] as bool? ?? false,
       createdAt: map['createdAt'] is Timestamp 
           ? (map['createdAt'] as Timestamp).toDate() 
           : (map['createdAt'] != null ? DateTime.parse(map['createdAt'] as String) : DateTime.now()),
@@ -201,6 +205,7 @@ class TransactionModel {
       'category': category,
       'description': description,
       'type': type.toString(),
+      'accountId': accountId,
       'fromAccount': fromAccount,
       'toAccount': toAccount,
       'userId': userId,
@@ -210,6 +215,7 @@ class TransactionModel {
       'status': status.toString(),
       'paidAmount': paidAmount,
       'isCarriedForward': isCarriedForward,
+      'isBusiness': isBusiness,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -265,6 +271,7 @@ class TransactionModel {
     String? accountId,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? isBusiness,
   }) {
     return TransactionModel(
       id: id ?? this.id,
@@ -286,6 +293,7 @@ class TransactionModel {
       accountId: accountId ?? this.accountId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      isBusiness: isBusiness ?? this.isBusiness,
     );
   }
 }

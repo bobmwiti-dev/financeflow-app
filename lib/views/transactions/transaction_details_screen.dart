@@ -174,7 +174,15 @@ class _TransactionDetailsScreenState extends State<TransactionDetailsScreen> {
               widget.transaction.category,
               _getCategoryColor(widget.transaction.category),
             ),
-            
+            if (widget.transaction.isBusiness) ...[
+              const Divider(),
+              _buildDetailRow(
+                context,
+                'Context',
+                'Business / Side-hustle',
+                Colors.deepPurple,
+              ),
+            ],
           ],
         ),
       ),
@@ -405,6 +413,7 @@ class _TransactionDetailsScreenState extends State<TransactionDetailsScreen> {
       userId: FirebaseAuth.instance.currentUser?.uid ?? '',
       accountId: widget.transaction.accountId,
       type: widget.transaction.type,
+      isBusiness: widget.transaction.isBusiness,
     );
     
     Navigator.push(

@@ -35,6 +35,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   bool _isExpense = true;
   bool _isLoading = false;
   String? _selectedAccountId;
+  bool _isBusiness = false;
 
   @override
   void initState() {
@@ -54,6 +55,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       _selectedDate = widget.transaction!.date;
       _selectedCategory = widget.transaction!.category;
       _selectedAccountId = widget.transaction!.accountId;
+      _isBusiness = widget.transaction!.isBusiness;
       
       // Load payment method from fromAccount (for income) or toAccount (for expense)
       final paymentMethod = _isExpense 
@@ -115,6 +117,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
               // Use fromAccount for income source, toAccount for expense payment method
               fromAccount: _isExpense ? null : _selectedPaymentMethod,
               toAccount: _isExpense ? _selectedPaymentMethod : null,
+              isBusiness: _isBusiness,
               updatedAt: DateTime.now(),
             )
           : Transaction(
@@ -129,6 +132,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
               // Use fromAccount for income source, toAccount for expense payment method
               fromAccount: _isExpense ? null : _selectedPaymentMethod,
               toAccount: _isExpense ? _selectedPaymentMethod : null,
+              isBusiness: _isBusiness,
             );
         
         if (widget.transaction != null && widget.transaction!.id != null) {
@@ -210,6 +214,8 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                     const SizedBox(height: 16),
                     _buildPaymentMethodDropdown(),
                     const SizedBox(height: 16),
+                    _buildBusinessToggle(),
+                    const SizedBox(height: 16),
                     _buildDescriptionField(),
                     const SizedBox(height: 24),
                     _buildSaveButton(),
@@ -257,6 +263,44 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                   child: Text('Income'),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBusinessToggle() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Business / Side-hustle',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Mark this transaction as part of your business or side-hustle.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            Switch(
+              value: _isBusiness,
+              onChanged: (value) {
+                setState(() {
+                  _isBusiness = value;
+                });
+              },
             ),
           ],
         ),
