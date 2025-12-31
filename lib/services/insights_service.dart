@@ -106,6 +106,7 @@ class InsightsService {
     insights.addAll(await _generateSpendingPatternInsights(transactions, targetMonth));
     insights.addAll(await _generateBudgetAlerts(transactions, budgets, targetMonth));
     insights.addAll(await _generateSavingOpportunities(transactions, targetMonth));
+    insights.addAll(await _generateBettingInsights(transactions, goals, targetMonth));
     insights.addAll(await _generateFinancialHealthInsights(
       transactions, budgets, goals, incomeSources, loans, targetMonth
     ));
@@ -379,7 +380,125 @@ class InsightsService {
     
     return insights;
   }
-  
+
+  Future<List<Insight>> _generateBettingInsights(
+    List<app_models.TransactionModel> transactions,
+    List<Goal> goals,
+    DateTime targetMonth,
+  ) async {
+    final List<Insight> insights = [];
+
+    if (transactions.isEmpty) {
+      return insights;
+    }
+
+    final bettingKeywords = <String>[
+      'sportpesa',
+      'betika',
+      '22bet',
+      'mozzart',
+      'odibets',
+      'betway',
+      'shabiki',
+      'mcheza',
+      'betlion',
+    ];
+
+    final funKeywords = <String>[
+      'club',
+      'pub',
+      'lounge',
+      'bar ',
+      'wine & spirits',
+    ];
+
+    final int year = targetMonth.year;
+    final int month = targetMonth.month;
+
+    double monthlyBetting = 0;
+    double yearlyBetting = 0;
+
+    for (final t in transactions) {
+      if (!t.isExpense) continue;
+
+      final text = '${t.title} ${t.description ?? ''} ${t.category}'.toLowerCase();
+      final matchesKeyword =
+          bettingKeywords.any((k) => text.contains(k)) ||
+          funKeywords.any((k) => text.contains(k));
+      if (!matchesKeyword) continue;
+
+      final amount = t.amount.abs();
+
+      if (t.date.year == year && t.date.month == month) {
+        monthlyBetting += amount;
+      }
+
+      if (t.date.year == year) {
+        yearlyBetting += amount;
+      }
+    }
+
+    if (monthlyBetting <= 0 && yearlyBetting <= 0) {
+      return insights;
+    }
+
+    final emergencyGoals = goals
+        .where((g) => g.category == 'Emergency Fund')
+        .toList();
+    final double emergencyTarget = emergencyGoals.isNotEmpty
+        ? emergencyGoals.first.targetAmount
+        : 0.0;
+
+    double? emergencyRatio;
+    if (emergencyTarget > 0) {
+      emergencyRatio = yearlyBetting / emergencyTarget;
+    }
+
+    final currencyFormat =
+        NumberFormat.currency(symbol: 'KSh ', decimalDigits: 0);
+    final monthStr = currencyFormat.format(monthlyBetting);
+    final yearStr = currencyFormat.format(yearlyBetting);
+
+    String description =
+        'You have spent $monthStr on betting and fun this month, and $yearStr so far this year.';
+
+    if (emergencyRatio != null && emergencyRatio > 0) {
+      final ratioPercent =
+          (emergencyRatio * 100).clamp(0, 999).toStringAsFixed(0);
+      description +=
+          ' This equals about $ratioPercent% of your Emergency Fund goal.';
+    }
+
+    if (monthlyBetting > 2000) {
+      description +=
+          ' Consider capping betting and fun spending at around KSh 2,000 per month to protect your savings.';
+    }
+
+    final isHighLeakage = emergencyRatio != null && emergencyRatio >= 0.3;
+
+    final insight = Insight(
+      id: DateTime.now().millisecondsSinceEpoch,
+      title: isHighLeakage
+          ? 'High betting and fun spending detected'
+          : 'Betting and fun spending overview',
+      description: description,
+      type: 'Expense Anomaly',
+      date: targetMonth,
+      data: {
+        'monthlyBetting': monthlyBetting,
+        'yearlyBetting': yearlyBetting,
+        'emergencyTarget': emergencyTarget,
+        'emergencyRatio': emergencyRatio,
+        'analysisMonth': DateFormat('yyyy-MM').format(targetMonth),
+      },
+      relevanceScore: isHighLeakage ? 0.95 : 0.7,
+    );
+
+    insights.add(insight);
+
+    return insights;
+  }
+
   // Helper method to get a saving suggestion for a category
   String? _getSavingSuggestion(String category, double amount) {
     final Map<String, List<String>> savingSuggestions = {
