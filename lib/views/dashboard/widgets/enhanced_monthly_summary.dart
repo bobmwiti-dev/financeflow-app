@@ -248,7 +248,7 @@ class _EnhancedMonthlySummaryState extends State<EnhancedMonthlySummary>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Monthly Summary',
+              'This month at a glance',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: Colors.grey.shade800,
@@ -281,51 +281,100 @@ class _EnhancedMonthlySummaryState extends State<EnhancedMonthlySummary>
   }
   
   Widget _buildSummaryRow(BuildContext context, Function currencyFormat, double income, double expenses, double savings, double? previousIncome, double? previousExpenses, double? budget) {
-    return Row(
+    final transactionViewModel = Provider.of<TransactionViewModel>(context, listen: false);
+    final mpesaFees = _getMonthlyMpesaFees(transactionViewModel);
+
+    return Column(
       children: [
-        Expanded(
-          child: _buildEnhancedSummaryItem(
-            context,
-            'Income',
-            _incomeAnimation.value,
-            Icons.trending_up,
-            [Colors.green.shade400, Colors.green.shade600],
-            previousIncome,
-            0,
-            () => _navigateToScreen(context, const IncomeScreen()),
-            budget,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _buildEnhancedSummaryItem(
+                context,
+                'Income',
+                _incomeAnimation.value,
+                Icons.trending_up,
+                [Colors.green.shade400, Colors.green.shade600],
+                previousIncome,
+                0,
+                () => _navigateToScreen(context, const IncomeScreen()),
+                budget,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildEnhancedSummaryItem(
+                context,
+                'Expenses',
+                _expenseAnimation.value,
+                Icons.trending_down,
+                [Colors.red.shade400, Colors.red.shade600],
+                previousExpenses,
+                1,
+                () => _navigateToScreen(context, const ExpensesScreen()),
+                budget,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildEnhancedSummaryItem(
-            context,
-            'Expenses',
-            _expenseAnimation.value,
-            Icons.trending_down,
-            [Colors.red.shade400, Colors.red.shade600],
-            previousExpenses,
-            1,
-            () => _navigateToScreen(context, const ExpensesScreen()),
-            budget,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildEnhancedSummaryItem(
-            context,
-            'Savings',
-            _savingsAnimation.value,
-            Icons.account_balance_wallet,
-            [Colors.blue.shade400, Colors.blue.shade600],
-            null,
-            2,
-            null,
-            budget,
-          ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildEnhancedSummaryItem(
+                context,
+                'Net',
+                _savingsAnimation.value,
+                Icons.account_balance_wallet,
+                [Colors.blue.shade400, Colors.blue.shade600],
+                null,
+                2,
+                null,
+                budget,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildEnhancedSummaryItem(
+                context,
+                'M-Pesa fees',
+                mpesaFees,
+                Icons.receipt_long,
+                [Colors.orange.shade400, Colors.orange.shade600],
+                null,
+                3,
+                null,
+                budget,
+              ),
+            ),
+          ],
         ),
       ],
     );
+  }
+
+  double _getMonthlyMpesaFees(TransactionViewModel transactionViewModel) {
+    final transactions = transactionViewModel.transactions;
+    double total = 0.0;
+
+    for (final t in transactions) {
+      if (t.date.year != widget.selectedMonth.year ||
+          t.date.month != widget.selectedMonth.month) {
+        continue;
+      }
+      if (!t.isExpense) continue;
+
+      final text = '${t.title} ${t.description ?? ''} ${t.category}'.toLowerCase();
+      final isFee = text.contains('fee') ||
+          text.contains('charges') ||
+          text.contains('transaction cost') ||
+          (text.contains('mpesa') && text.contains('charge'));
+      if (!isFee) continue;
+
+      total += t.amount.abs();
+    }
+
+    return total;
   }
   
   Widget _buildEnhancedSummaryItem(
