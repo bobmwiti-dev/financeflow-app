@@ -163,6 +163,8 @@ class KenyaFinancialInsightsCard extends StatelessWidget {
     }).toList();
     
     if (monthTransactions.isEmpty) return insights;
+
+    final totalIncome = incomeViewModel.getTotalIncome();
     
     // 1. M-Pesa Usage Analysis
     final mpesaTransactions = monthTransactions.where((tx) => 
@@ -184,7 +186,68 @@ class KenyaFinancialInsightsCard extends StatelessWidget {
       ));
     }
     
-    // 2. Transport Spending Analysis
+    // 2. Pure Betting Insight (SportPesa, Betika, etc.)
+    const bettingKeywords = [
+      'sportpesa',
+      'betika',
+      'odibets',
+      'betway',
+      '1xbet',
+      '22bet',
+      'betlion',
+      'melbet',
+      'bangbet',
+      'betwinner',
+    ];
+
+    bool _isBettingTx(dynamic tx) {
+      if (tx.isExpense != true) return false;
+      final desc = (tx.description ?? tx.title ?? '').toString().toLowerCase();
+      for (final keyword in bettingKeywords) {
+        if (desc.contains(keyword)) return true;
+      }
+      return false;
+    }
+
+    final bettingMonthTx = monthTransactions.where(_isBettingTx).toList();
+    if (bettingMonthTx.isNotEmpty) {
+      final bettingMonthAmount = bettingMonthTx
+          .fold<double>(0, (sum, tx) => sum + tx.amount.abs());
+
+      // Last 12 months betting spend (approximate leakage magnitude)
+      final oneYearAgo = DateTime(now.year - 1, now.month, now.day);
+      final bettingYearTx = transactions
+          .where((tx) =>
+              tx.date.isAfter(oneYearAgo) &&
+              tx.date.isBefore(now.add(const Duration(days: 1))) &&
+              _isBettingTx(tx))
+          .toList();
+      final bettingYearAmount = bettingYearTx
+          .fold<double>(0, (sum, tx) => sum + tx.amount.abs());
+
+      final bettingShareOfIncome = totalIncome > 0
+          ? (bettingMonthAmount / totalIncome) * 100
+          : 0.0;
+
+      final yearlyEstimate = bettingYearAmount > 0
+          ? bettingYearAmount
+          : bettingMonthAmount * 12;
+
+      final shareText = bettingShareOfIncome > 0
+          ? bettingShareOfIncome.toStringAsFixed(1)
+          : '0';
+
+      insights.add(KenyaFinancialInsight(
+        title: 'Betting Leakage',
+        description:
+            'You spent KES ${bettingMonthAmount.toStringAsFixed(0)} on betting this month (~$shareText% of income). At this pace that is about KES ${yearlyEstimate.toStringAsFixed(0)} per year that could build your emergency fund instead.',
+        icon: Icons.sports_esports,
+        color: Colors.red.shade700,
+        amount: bettingMonthAmount,
+      ));
+    }
+    
+    // 3. Transport Spending Analysis
     final transportSpending = _getCategorySpending(monthTransactions, ['Transport', 'Fuel', 'Matatu']);
     if (transportSpending > 0) {
       final totalIncome = incomeViewModel.getTotalIncome();
@@ -201,7 +264,7 @@ class KenyaFinancialInsightsCard extends StatelessWidget {
       }
     }
     
-    // 3. Utility Bills Optimization
+    // 4. Utility Bills Optimization
     final utilitySpending = _getCategorySpending(monthTransactions, ['Utilities', 'Bills']);
     if (utilitySpending > 0) {
       insights.add(KenyaFinancialInsight(
@@ -213,7 +276,7 @@ class KenyaFinancialInsightsCard extends StatelessWidget {
       ));
     }
     
-    // 4. School Fees Planning (Kenya-specific)
+    // 5. School Fees Planning (Kenya-specific)
     final educationSpending = _getCategorySpending(monthTransactions, ['Education', 'School Fees']);
     if (educationSpending > 0) {
       insights.add(KenyaFinancialInsight(
@@ -225,8 +288,7 @@ class KenyaFinancialInsightsCard extends StatelessWidget {
       ));
     }
     
-    // 5. Emergency Fund Recommendation (Kenya context)
-    final totalIncome = incomeViewModel.getTotalIncome();
+    // 6. Emergency Fund Recommendation (Kenya context)
     final totalExpenses = _getTotalExpenses(monthTransactions);
     final savingsRate = ((totalIncome - totalExpenses) / totalIncome) * 100;
     
