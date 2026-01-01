@@ -200,7 +200,7 @@ class KenyaFinancialInsightsCard extends StatelessWidget {
       'betwinner',
     ];
 
-    bool _isBettingTx(dynamic tx) {
+    bool isBettingTx(dynamic tx) {
       if (tx.isExpense != true) return false;
       final desc = (tx.description ?? tx.title ?? '').toString().toLowerCase();
       for (final keyword in bettingKeywords) {
@@ -209,7 +209,7 @@ class KenyaFinancialInsightsCard extends StatelessWidget {
       return false;
     }
 
-    final bettingMonthTx = monthTransactions.where(_isBettingTx).toList();
+    final bettingMonthTx = monthTransactions.where(isBettingTx).toList();
     if (bettingMonthTx.isNotEmpty) {
       final bettingMonthAmount = bettingMonthTx
           .fold<double>(0, (sum, tx) => sum + tx.amount.abs());
@@ -220,7 +220,7 @@ class KenyaFinancialInsightsCard extends StatelessWidget {
           .where((tx) =>
               tx.date.isAfter(oneYearAgo) &&
               tx.date.isBefore(now.add(const Duration(days: 1))) &&
-              _isBettingTx(tx))
+              isBettingTx(tx))
           .toList();
       final bettingYearAmount = bettingYearTx
           .fold<double>(0, (sum, tx) => sum + tx.amount.abs());
