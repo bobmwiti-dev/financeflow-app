@@ -717,6 +717,30 @@ class InsightsService {
     final List<Insight> insights = [];
     if (transactions.length < 3) return insights; // Need at least a few transactions
 
+    // Kenya-specific subscription keywords (streaming, TV, internet, bundles, etc.)
+    const subscriptionKeywords = [
+      'netflix',
+      'spotify',
+      'showmax',
+      'dstv',
+      'gotv',
+      'startimes',
+      'amazon prime',
+      'prime video',
+      'apple music',
+      'microsoft 365',
+      'office 365',
+      'zuku',
+      'faiba',
+      'safaricom',
+      'airtel',
+      'telkom',
+      'fibre',
+      'fiber',
+      'bundle',
+      'data plan',
+    ];
+
     // 1. Group transactions by payee/title
     final Map<String, List<app_models.TransactionModel>> byPayee = {};
     for (var t in transactions) {
@@ -733,6 +757,10 @@ class InsightsService {
 
       if (payeeTransactions.length < 2) continue; // Need at least 2 transactions to find a pattern
 
+      final lowerPayee = payee.toLowerCase();
+      final isKenyanSubscriptionMerchant =
+          subscriptionKeywords.any((keyword) => lowerPayee.contains(keyword));
+
       // Sort by date to analyze intervals
       payeeTransactions.sort((a, b) => a.date.compareTo(b.date));
 
@@ -744,15 +772,32 @@ class InsightsService {
         final daysBetween = t2.date.difference(t1.date).inDays;
         final amountDifference = (t1.amount - t2.amount).abs();
 
+        final baseAmount = t1.amount.abs();
+        if (baseAmount == 0) {
+          continue;
+        }
+
+        final amountRatio = amountDifference / baseAmount;
+        final intervalOkStrict = daysBetween >= 28 && daysBetween <= 32;
+        final amountOkStrict = amountRatio < 0.10;
+
+        // Slightly looser heuristic for well-known Kenyan subscription merchants
+        final intervalOkLoose = daysBetween >= 20 && daysBetween <= 40;
+        final amountOkLoose = amountRatio < 0.25;
+
+        final isStrictMatch = intervalOkStrict && amountOkStrict;
+        final isKenyaHintMatch =
+            isKenyanSubscriptionMerchant && intervalOkLoose && amountOkLoose;
+
         // Check for monthly interval (28-32 days) and similar amount (e.g., within 10% variance)
-        if ((daysBetween >= 28 && daysBetween <= 32) && (amountDifference / t1.amount.abs() < 0.10)) {
+        if (isStrictMatch || isKenyaHintMatch) {
           // Potential subscription found
           final currencyFormat = NumberFormat.currency(symbol: 'KSh ', decimalDigits: 2);
           final insight = Insight(
             id: DateTime.now().millisecondsSinceEpoch + payee.hashCode,
             title: 'Potential Subscription Found',
-            description: 'We noticed a recurring payment to \'$payee\' for around ${currencyFormat.format(t1.amount.abs())}. Would you like to track this as a monthly subscription?',
-            type: 'recommendation',
+            description: 'We noticed a recurring payment to \'$payee\' for around ${currencyFormat.format(t1.amount.abs())}. You can track this as a monthly subscription in Bills & Subscriptions.',
+            type: 'Subscription Insight',
             date: t2.date, // Use the date of the last transaction
             data: {
               'payee': payee,

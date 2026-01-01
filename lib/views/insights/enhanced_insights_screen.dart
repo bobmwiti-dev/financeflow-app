@@ -158,6 +158,8 @@ class _EnhancedInsightsScreenState extends State<EnhancedInsightsScreen> with Si
         return Icons.credit_score;
       case 'Debt Management':
         return Icons.money_off;
+      case 'Subscription Insight':
+        return Icons.subscriptions;
       default:
         return FontAwesomeIcons.lightbulb;
     }
@@ -186,6 +188,8 @@ class _EnhancedInsightsScreenState extends State<EnhancedInsightsScreen> with Si
         return Colors.lightBlue.shade700;
       case 'Debt Management':
         return Colors.red.shade700;
+      case 'Subscription Insight':
+        return Colors.purple.shade700;
       default:
         return Colors.blueGrey.shade700;
     }
@@ -249,7 +253,8 @@ class _EnhancedInsightsScreenState extends State<EnhancedInsightsScreen> with Si
                   insight.type == 'Budget Alert' || 
                   insight.type == 'Saving Opportunity' ||
                   insight.type == 'Financial Health' ||
-                  insight.type == 'Expense Anomaly')
+                  insight.type == 'Expense Anomaly' ||
+                  insight.type == 'Subscription Insight')
               .take(3)
               .map((insight) => Padding(
                     padding: const EdgeInsets.only(bottom: 16),
@@ -711,7 +716,8 @@ class _EnhancedInsightsScreenState extends State<EnhancedInsightsScreen> with Si
         return allInsights.where((insight) => 
           insight.type.contains('Spending') || 
           insight.type.contains('Budget') || 
-          insight.type.contains('Expense')
+          insight.type.contains('Expense') ||
+          insight.type.contains('Subscription')
         ).toList();
       case 3: // Saving
         return allInsights.where((insight) => 
