@@ -236,7 +236,7 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
   }
 
   Widget _buildDynamicTrendCard(String title, Color color) {
-    final currencyFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 0);
+    final currencyFormat = NumberFormat.currency(symbol: 'KES ', decimalDigits: 0);
     
     // Get current month data
     double current = 0.0;
@@ -614,7 +614,7 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
                     final netFlow = income - expenses;
                     
                     return BarTooltipItem(
-                      '$monthName\nIncome: \$${income.toStringAsFixed(0)}\nExpenses: \$${expenses.toStringAsFixed(0)}\nNet: \$${netFlow.toStringAsFixed(0)}',
+                      '$monthName\nIncome: KES ${income.toStringAsFixed(0)}\nExpenses: KES ${expenses.toStringAsFixed(0)}\nNet: KES ${netFlow.toStringAsFixed(0)}',
                       const TextStyle(
                         color: Colors.white, 
                         fontSize: 11, 
@@ -652,9 +652,9 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
                     showTitles: true,
                     reservedSize: 40,
                     getTitlesWidget: (value, meta) {
-                      if (value == 0) return const Text('\$0');
+                      if (value == 0) return const Text('KES 0');
                       return Text(
-                        '\$${(value / 1000).toStringAsFixed(0)}K',
+                        'KES ${(value / 1000).toStringAsFixed(0)}K',
                         style: const TextStyle(color: Colors.grey, fontSize: 9),
                       );
                     },
@@ -814,12 +814,12 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
                     
                     if (rodIndex == 0) {
                       return BarTooltipItem(
-                        '$monthName\nIncome: \$${(data['income'] as double).toStringAsFixed(0)}',
+                        '$monthName\nIncome: KES ${(data['income'] as double).toStringAsFixed(0)}',
                         const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                       );
                     } else {
                       return BarTooltipItem(
-                        '$monthName\nExpenses: \$${(data['expenses'] as double).toStringAsFixed(0)}',
+                        '$monthName\nExpenses: KES ${(data['expenses'] as double).toStringAsFixed(0)}',
                         const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                       );
                     }
@@ -853,9 +853,9 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
                     showTitles: true,
                     reservedSize: 40,
                     getTitlesWidget: (value, meta) {
-                      if (value == 0) return const Text('\$0');
+                      if (value == 0) return const Text('KES 0');
                       return Text(
-                        '\$${(value / 1000).toStringAsFixed(0)}K',
+                        'KES ${(value / 1000).toStringAsFixed(0)}K',
                         style: const TextStyle(color: Colors.grey, fontSize: 9),
                       );
                     },
@@ -1121,7 +1121,7 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
             ),
           ),
           Text(
-            'Save \$${savings.toStringAsFixed(0)}/year',
+            'Save KES ${savings.toStringAsFixed(0)}/year',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -1225,7 +1225,7 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
             ),
           ),
           Text(
-            '${isIncrease ? '+' : ''}\$${adjustment.abs().toStringAsFixed(0)}',
+            '${isIncrease ? '+' : ''}KES ${adjustment.abs().toStringAsFixed(0)}',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,

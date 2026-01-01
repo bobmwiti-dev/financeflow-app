@@ -115,7 +115,7 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
         final double totalSpent = budgetsWithRealData.fold(0.0, (sum, b) => sum + b.spent);
         final double ratio = totalBudget > 0 ? totalSpent / totalBudget : 0;
         
-        _logger.info('Total budget: \$${totalBudget.toStringAsFixed(2)}, Total spent: \$${totalSpent.toStringAsFixed(2)}, Ratio: ${(ratio * 100).toStringAsFixed(1)}%');
+        _logger.info('Total budget: KES ${totalBudget.toStringAsFixed(2)}, Total spent: KES ${totalSpent.toStringAsFixed(2)}, Ratio: ${(ratio * 100).toStringAsFixed(1)}%');
         
         // Trigger celebration for good budget adherence
         if (ratio <= 0.8 && !_hasShownCelebration) {
@@ -137,7 +137,7 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
             .toList()
             ..sort((a, b) => (a.amount - a.spent).compareTo(b.amount - b.spent));
         
-        final currency = NumberFormat.currency(symbol: '\$', decimalDigits: 0);
+        final currency = NumberFormat.currency(symbol: 'KES ', decimalDigits: 0);
         
         // Calculate days until next payday (assuming monthly salary on 1st)
         final now = DateTime.now();

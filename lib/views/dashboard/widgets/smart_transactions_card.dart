@@ -315,7 +315,7 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
   }
 
   Widget _buildSmartTransactionTile(Transaction transaction, int index) {
-    final currencyFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
+    final currencyFormat = NumberFormat.currency(symbol: 'KES ', decimalDigits: 2);
     final isExpense = transaction.isExpense;
     final isHovered = _hoveredIndex == index;
     
