@@ -1,5 +1,6 @@
 import 'package:provider/provider.dart';
 import 'package:financeflow_app/viewmodels/bill_viewmodel.dart';
+import 'package:financeflow_app/viewmodels/insights_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:financeflow_app/utils/currency_extensions.dart';
@@ -16,6 +17,7 @@ class UpcomingBillsCard extends StatefulWidget {
 class _UpcomingBillsCardState extends State<UpcomingBillsCard> {
   late Future<List<Bill>> _upcomingFuture;
   BillViewModel? _billViewModel;
+  bool _requestedInsights = false;
 
   @override
   void didChangeDependencies() {
@@ -24,6 +26,12 @@ class _UpcomingBillsCardState extends State<UpcomingBillsCard> {
     if (_billViewModel != vm) {
       _billViewModel = vm;
       _upcomingFuture = _billViewModel!.getUpcomingBills(limit: 10);
+    }
+
+    if (!_requestedInsights) {
+      _requestedInsights = true;
+      final insightsVm = Provider.of<InsightsViewModel>(context, listen: false);
+      insightsVm.loadInsights();
     }
   }
 
@@ -120,9 +128,61 @@ class _UpcomingBillsCardState extends State<UpcomingBillsCard> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Bills & Subscriptions',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    Row(
+                      children: [
+                        Text(
+                          'Bills & Subscriptions',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 8),
+                        Consumer<InsightsViewModel>(
+                          builder: (context, insightsVm, _) {
+                            final now = DateTime.now();
+                            final subscriptionInsights = insightsVm.insights.where((insight) {
+                              final data = insight.data;
+                              if (data == null) return false;
+                              final hasSubFields = data['payee'] != null && data['amount'] != null;
+                              final typeLower = insight.type.toLowerCase();
+                              final isSubscriptionInsight =
+                                  typeLower.contains('subscription') || typeLower.contains('recommendation');
+                              final isRecent = insight.date.isAfter(now.subtract(const Duration(days: 60)));
+                              return hasSubFields && isSubscriptionInsight && isRecent;
+                            }).toList();
+
+                            if (subscriptionInsights.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+
+                            final colorScheme = Theme.of(context).colorScheme;
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.auto_awesome,
+                                    size: 14,
+                                    color: colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'New subscriptions detected',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: colorScheme.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                     if (bills.length > 3) // Or some other logic if you want 'View All' always
                       TextButton(
