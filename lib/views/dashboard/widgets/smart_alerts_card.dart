@@ -18,11 +18,19 @@ class SmartAlertsCard extends StatelessWidget {
         if (alerts.isEmpty) {
           return const SizedBox.shrink();
         }
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
 
         return Card(
-          margin: const EdgeInsets.all(16),
-          elevation: 4,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+              width: 1,
+            ),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
