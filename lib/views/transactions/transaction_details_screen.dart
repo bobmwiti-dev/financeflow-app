@@ -23,12 +23,19 @@ class _TransactionDetailsScreenState extends State<TransactionDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final isExpense = widget.transaction.amount < 0;
-    final currencyFormat = NumberFormat.currency(symbol: '\$');
+    final currencyFormat = NumberFormat.currency(symbol: 'KES ');
     final dateFormat = DateFormat(AppConstants.dateFormat);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final primary = colorScheme.primary;
+    final accent = isExpense ? AppTheme.expenseColor : AppTheme.incomeColor;
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Transaction Details'),
+        title: const Text('Transaction'),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: theme.scaffoldBackgroundColor,
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
@@ -60,66 +67,218 @@ class _TransactionDetailsScreenState extends State<TransactionDetailsScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(context, isExpense),
-            const SizedBox(height: 24),
-            _buildDetailsCard(context, isExpense, currencyFormat, dateFormat),
-            if (widget.transaction.description != null && widget.transaction.description!.isNotEmpty) ...[
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildPremiumHeader(
+                context,
+                isExpense: isExpense,
+                currencyFormat: currencyFormat,
+                dateFormat: dateFormat,
+                accent: accent,
+                primary: primary,
+              ),
               const SizedBox(height: 16),
-              _buildDescriptionCard(context),
+              _buildDetailsCard(context, isExpense, currencyFormat, dateFormat),
+              if (widget.transaction.description != null && widget.transaction.description!.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _buildDescriptionCard(context),
+              ],
+              const SizedBox(height: 12),
+              _buildActionsCard(context, isExpense),
             ],
-            const SizedBox(height: 16),
-            _buildActionsCard(context, isExpense),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool isExpense) {
-    final currencyFormat = NumberFormat.currency(symbol: '\$');
-    
-    return Center(
+  Widget _buildPremiumHeader(
+    BuildContext context, {
+    required bool isExpense,
+    required NumberFormat currencyFormat,
+    required DateFormat dateFormat,
+    required Color accent,
+    required Color primary,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final categoryColor = _getCategoryColor(widget.transaction.category);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            primary.withAlpha((0.95 * 255).toInt()),
+            colorScheme.secondary.withAlpha((0.85 * 255).toInt()),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha((0.10 * 255).toInt()),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CategoryIcons.getBrandCircleWidget(
-            widget.transaction.title,
-            size: 80.0,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            widget.transaction.title,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            currencyFormat.format(widget.transaction.amount.abs()),
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: isExpense ? AppTheme.expenseColor : AppTheme.incomeColor,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: _getCategoryColor(widget.transaction.category).withAlpha((0.1 * 255).toInt()),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              widget.transaction.category,
-              style: TextStyle(
-                color: _getCategoryColor(widget.transaction.category),
-                fontWeight: FontWeight.bold,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha((0.16 * 255).toInt()),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: CategoryIcons.getBrandCircleWidget(
+                  widget.transaction.title,
+                  size: 56.0,
+                ),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.transaction.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      dateFormat.format(widget.transaction.date),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withAlpha((0.85 * 255).toInt()),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Text(
+                  currencyFormat.format(widget.transaction.amount.abs()),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.displaySmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: -0.6,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha((0.14 * 255).toInt()),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: Colors.white.withAlpha((0.22 * 255).toInt()),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isExpense ? Icons.trending_down : Icons.trending_up,
+                      size: 16,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      isExpense ? 'Expense' : 'Income',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildPill(
+                context,
+                label: widget.transaction.category,
+                icon: Icons.sell_outlined,
+                fg: categoryColor,
+                bg: Colors.white,
+              ),
+              if (widget.transaction.isBusiness)
+                _buildPill(
+                  context,
+                  label: 'Business / Side-hustle',
+                  icon: Icons.work_outline,
+                  fg: Colors.deepPurple,
+                  bg: Colors.white,
+                ),
+              _buildPill(
+                context,
+                label: isExpense ? 'Money out' : 'Money in',
+                icon: Icons.account_balance_wallet_outlined,
+                fg: accent,
+                bg: Colors.white,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPill(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required Color fg,
+    required Color bg,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: bg.withAlpha((0.95 * 255).toInt()),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: fg),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: fg,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -133,54 +292,65 @@ class _TransactionDetailsScreenState extends State<TransactionDetailsScreen> {
     NumberFormat currencyFormat, 
     DateFormat dateFormat
   ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outlineVariant.withAlpha((0.6 * 255).toInt())),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Details',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 16),
-            _buildDetailRow(
+            const SizedBox(height: 8),
+            _buildDetailTile(
               context,
-              'Transaction Type',
-              isExpense ? 'Expense' : 'Income',
-              isExpense ? AppTheme.expenseColor : AppTheme.incomeColor,
+              icon: isExpense ? Icons.trending_down : Icons.trending_up,
+              label: 'Transaction type',
+              value: isExpense ? 'Expense' : 'Income',
+              valueColor: isExpense ? AppTheme.expenseColor : AppTheme.incomeColor,
             ),
-            const Divider(),
-            _buildDetailRow(
+            const SizedBox(height: 4),
+            _buildDetailTile(
               context,
-              'Amount',
-              currencyFormat.format(widget.transaction.amount.abs()),
-              null,
+              icon: Icons.payments_outlined,
+              label: 'Amount',
+              value: currencyFormat.format(widget.transaction.amount.abs()),
+              valueColor: null,
             ),
-            const Divider(),
-            _buildDetailRow(
+            const SizedBox(height: 4),
+            _buildDetailTile(
               context,
-              'Date',
-              dateFormat.format(widget.transaction.date),
-              null,
+              icon: Icons.event_outlined,
+              label: 'Date',
+              value: dateFormat.format(widget.transaction.date),
+              valueColor: null,
             ),
-            const Divider(),
-            _buildDetailRow(
+            const SizedBox(height: 4),
+            _buildDetailTile(
               context,
-              'Category',
-              widget.transaction.category,
-              _getCategoryColor(widget.transaction.category),
+              icon: Icons.sell_outlined,
+              label: 'Category',
+              value: widget.transaction.category,
+              valueColor: _getCategoryColor(widget.transaction.category),
             ),
             if (widget.transaction.isBusiness) ...[
-              const Divider(),
-              _buildDetailRow(
+              const SizedBox(height: 4),
+              _buildDetailTile(
                 context,
-                'Context',
-                'Business / Side-hustle',
-                Colors.deepPurple,
+                icon: Icons.work_outline,
+                label: 'Context',
+                value: 'Business / Side-hustle',
+                valueColor: Colors.deepPurple,
               ),
             ],
           ],
@@ -189,30 +359,53 @@ class _TransactionDetailsScreenState extends State<TransactionDetailsScreen> {
     );
   }
 
-  Widget _buildDetailRow(
-    BuildContext context,
-    String label,
-    String value,
-    Color? valueColor,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+  Widget _buildDetailTile(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color? valueColor,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withAlpha((0.55 * 255).toInt()),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: valueColor,
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: valueColor ?? colorScheme.onSurface,
+              ),
             ),
           ),
         ],
@@ -221,24 +414,37 @@ class _TransactionDetailsScreenState extends State<TransactionDetailsScreen> {
   }
 
   Widget _buildDescriptionCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outlineVariant.withAlpha((0.6 * 255).toInt())),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Description',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                Icon(Icons.notes_outlined, size: 18, color: colorScheme.onSurfaceVariant),
+                const SizedBox(width: 8),
+                Text(
+                  'Description',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             Text(
               widget.transaction.description!,
-              style: const TextStyle(
-                fontSize: 16,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                height: 1.35,
+                color: colorScheme.onSurface,
               ),
             ),
           ],
@@ -248,72 +454,34 @@ class _TransactionDetailsScreenState extends State<TransactionDetailsScreen> {
   }
 
   Widget _buildActionsCard(BuildContext context, bool isExpense) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outlineVariant.withAlpha((0.6 * 255).toInt())),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Actions',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildActionButton(
-                  context,
-                  'Duplicate',
-                  Icons.content_copy,
-                  AppTheme.primaryColor,
-                  () {
-                    // Duplicate transaction logic
-                    _duplicateTransaction(context);
-                  },
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButton(
-    BuildContext context,
-    String label,
-    IconData icon,
-    Color color,
-    VoidCallback onPressed,
-  ) {
-    return InkWell(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withAlpha((0.1 * 255).toInt()),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 8),
             Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.bold,
+              'Actions',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.tonalIcon(
+                onPressed: () {
+                  _duplicateTransaction(context);
+                },
+                icon: const Icon(Icons.content_copy),
+                label: const Text('Duplicate transaction'),
               ),
             ),
           ],
@@ -326,6 +494,7 @@ class _TransactionDetailsScreenState extends State<TransactionDetailsScreen> {
     showDialog(
       context: context,
       builder: (context) {
+        final theme = Theme.of(context);
         return AlertDialog(
           title: const Text('Delete Transaction'),
           content: const Text(
@@ -338,14 +507,12 @@ class _TransactionDetailsScreenState extends State<TransactionDetailsScreen> {
               },
               child: const Text('Cancel'),
             ),
-            ElevatedButton(
+            FilledButton(
               onPressed: () {
                 // Handle delete transaction
                 _deleteTransaction(context);
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.errorColor,
-              ),
+              style: FilledButton.styleFrom(backgroundColor: theme.colorScheme.error),
               child: const Text('Delete'),
             ),
           ],
