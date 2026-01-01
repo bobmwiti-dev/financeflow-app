@@ -467,6 +467,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Widget build(BuildContext context) {
     // Access RealtimeDataService for real-time updates when needed
     Provider.of<RealtimeDataService>(context, listen: false);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     
     logger.info('Building dashboard - Loading: $_isLoading, Error: $_isError, Refreshing: $_isRefreshing');
     
@@ -512,7 +514,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           }
         },
       ),
-      body: _buildBody(context),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              colorScheme.primary.withAlpha((0.06 * 255).toInt()),
+              theme.scaffoldBackgroundColor,
+              theme.scaffoldBackgroundColor,
+            ],
+          ),
+        ),
+        child: _buildBody(context),
+      ),
       // bottomNavigationBar: _buildBottomNavigationBar(context), // Removed
     );
   }
