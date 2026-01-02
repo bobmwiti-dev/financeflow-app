@@ -655,14 +655,37 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             ).animate().fadeIn(delay: 50.ms, duration: 400.ms),
             const SizedBox(height: 16),
 
+            // Financial summary card with chart visualization
+            Consumer<IncomeViewModel>(
+              builder: (context, incomeViewModel, child) {
+                return FinancialSummaryCard(
+                  income: incomeViewModel.getTotalIncome(),
+                  expenses: _expenses,
+                  balance: _balance,
+                  categoryTotals: _categoryTotals,
+                  isRefreshing: _isRefreshing,
+                  previousIncome: _previousIncome > 0 ? _previousIncome : null,
+                  previousExpenses: _previousExpenses > 0 ? _previousExpenses : null,
+                  transactionHistory: _transactionHistory,
+                  incomeHistory: _incomeHistory,
+                  selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1),
+                ).animate().fadeIn(delay: 75.ms, duration: 400.ms);
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Monthly spending trend card
+            const SpendingTrendChart().animate().fadeIn(delay: 100.ms, duration: 400.ms),
+            const SizedBox(height: 16),
+
             // Safe-to-spend + cash flow forecast
             EnhancedSafeToSpendCard(
               selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1),
-            ).animate().fadeIn(delay: 75.ms, duration: 400.ms),
+            ).animate().fadeIn(delay: 125.ms, duration: 400.ms),
             const SizedBox(height: 16),
             EnhancedCashFlowForecastCard(
               onViewDetails: () => Navigator.pushNamed(context, '/cash_flow_forecast'),
-            ).animate().fadeIn(delay: 100.ms, duration: 400.ms),
+            ).animate().fadeIn(delay: 150.ms, duration: 400.ms),
             const SizedBox(height: 16),
 
             // Next upcoming debits
@@ -700,23 +723,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             // M-Pesa Import Card
             const MpesaImportCard().animate().fadeIn(delay: 225.ms, duration: 400.ms),
             const SizedBox(height: 16),
-            // Financial summary card with chart visualization
-            Consumer<IncomeViewModel>(
-              builder: (context, incomeViewModel, child) {
-                return FinancialSummaryCard(
-                  income: incomeViewModel.getTotalIncome(),
-                  expenses: _expenses,
-                  balance: _balance,
-                  categoryTotals: _categoryTotals,
-                  isRefreshing: _isRefreshing,
-                  previousIncome: _previousIncome > 0 ? _previousIncome : null,
-                  previousExpenses: _previousExpenses > 0 ? _previousExpenses : null,
-                  transactionHistory: _transactionHistory,
-                  incomeHistory: _incomeHistory,
-                  selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1),
-                ).animate().fadeIn(delay: 200.ms, duration: 400.ms);
-              },
-            ),
             // Recent Transactions
             RecentTransactionsCard(selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1)),
             const SizedBox(height: 16),
@@ -768,14 +774,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             const SmartAlertsCard().animate().fadeIn(delay: 700.ms, duration: 500.ms),
             const SizedBox(height: 24),
             
-            
             // Spending by category
-                        BudgetAdherenceCard(selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1)).animate().fadeIn(delay: 610.ms, duration: 500.ms),
+            BudgetAdherenceCard(selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1)).animate().fadeIn(delay: 610.ms, duration: 500.ms),
             const SizedBox(height: 24),
-            const SpendingTrendChart().animate().fadeIn(delay: 620.ms, duration: 500.ms),
-            // Spending by category moved to Financial Summary card
-            const SizedBox(height: 24),
-            
             const SizedBox(height: 70), // Space for FAB
           ],
         ),
@@ -843,7 +844,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         ? user!.displayName!.split(' ').map((e) => e[0]).take(2).join().toUpperCase()
         : 'U';
 
-    final hour = DateTime.now().hour;
+    final now = DateTime.now();
+    final hour = now.hour;
     String greeting;
     if (hour < 12) {
       greeting = 'Good morning,';
@@ -854,7 +856,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
 
     // Dynamic subtitle
-    final dayOfWeek = DateFormat('EEEE').format(DateTime.now());
+    final dayOfWeek = DateFormat('EEEE').format(now);
+    final thisMonthLabel = 'This month: ${_months[_selectedMonthIndex]}';
     String subtitle = "Here's your financial overview for today.";
     final totalIncome = _incomeViewModel.getTotalIncome();
     if (_expenses > 0 && totalIncome > 0) {
@@ -866,62 +869,86 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       } else {
         subtitle = "Let's review your spending for the month.";
       }
+    } else if (dayOfWeek == 'Friday') {
+      subtitle = "It's Friday — a great time to check in on your money wins.";
+    } else if (dayOfWeek == 'Saturday' || dayOfWeek == 'Sunday') {
+      subtitle = "Weekend check-in: keep your spending aligned with your goals.";
     } else if (dayOfWeek == 'Monday') {
       subtitle = "A new week, a fresh start for your finances!";
     }
 
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    greeting,
-                    style: TextStyle(
-                      fontSize: 22,
-                      color: Colors.grey[600],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      greeting,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: colorScheme.onSurface.withValues(alpha: 0.7),
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  Text(
-                    displayName,
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const Spacer(),
-              CircleAvatar(
-                radius: 28,
-                backgroundImage: photoURL != null ? NetworkImage(photoURL) : null,
-                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                child: photoURL == null
-                    ? Text(
-                        initials,
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.85),
+                      ),
+                      child: Text(
+                        thisMonthLabel,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          letterSpacing: 0.3,
                         ),
-                      )
-                    : null,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[700],
-              fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  displayName,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurface.withValues(alpha: 0.85),
+                    fontStyle: FontStyle.italic,
+                    height: 1.3,
+                  ),
+                ),
+              ],
             ),
+          ),
+          const SizedBox(width: 12),
+          CircleAvatar(
+            radius: 26,
+            backgroundImage: photoURL != null ? NetworkImage(photoURL) : null,
+            backgroundColor: colorScheme.primaryContainer,
+            child: photoURL == null
+                ? Text(
+                    initials,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                  )
+                : null,
           ),
         ],
       ),
