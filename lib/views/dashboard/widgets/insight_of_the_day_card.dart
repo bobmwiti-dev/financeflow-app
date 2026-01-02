@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../models/insight_model.dart';
 import '../../../services/insight_service.dart';
@@ -32,6 +33,7 @@ class _InsightOfTheDayCardState extends State<InsightOfTheDayCard>
   Timer? _timer;
   bool _isPaused = false;
   bool _isExpanded = false;
+  bool _preAutoAdvanceHapticPlayed = false;
   Insight? _lastDismissed;
   int? _lastDismissedIndex;
   DateTime? _lastSelectedMonth;
@@ -55,6 +57,14 @@ class _InsightOfTheDayCardState extends State<InsightOfTheDayCard>
       }
     });
 
+    _progressAnimationController.addListener(() {
+      final value = _progressAnimationController.value;
+      if (!_isPaused && !_isExpanded && !_preAutoAdvanceHapticPlayed && value >= 0.875) {
+        _preAutoAdvanceHapticPlayed = true;
+        HapticFeedback.selectionClick();
+      }
+    });
+
     // Initialize service and fetch insights after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeService();
@@ -71,6 +81,7 @@ class _InsightOfTheDayCardState extends State<InsightOfTheDayCard>
 
   void _startTimer() {
     _timer?.cancel(); // Cancel any existing timer
+    _preAutoAdvanceHapticPlayed = false;
     _progressAnimationController.forward(from: 0.0);
     _timer = Timer.periodic(const Duration(seconds: 8), (timer) {
       if (!_isPaused) {
@@ -80,6 +91,9 @@ class _InsightOfTheDayCardState extends State<InsightOfTheDayCard>
   }
 
   void _nextInsight({bool isAutomatic = false}) {
+    if (!isAutomatic) {
+      HapticFeedback.lightImpact();
+    }
     setState(() {
       _swipeDirection = 1;
       if (_currentIndex < _insights.length - 1) {
@@ -88,12 +102,14 @@ class _InsightOfTheDayCardState extends State<InsightOfTheDayCard>
         _currentIndex = 0; // Loop back to the start
       }
       if (!_isPaused) {
+        _preAutoAdvanceHapticPlayed = false;
         _progressAnimationController.forward(from: 0.0);
       }
     });
   }
 
   void _previousInsight() {
+    HapticFeedback.lightImpact();
     setState(() {
       _swipeDirection = -1;
       if (_currentIndex > 0) {
@@ -102,6 +118,7 @@ class _InsightOfTheDayCardState extends State<InsightOfTheDayCard>
         _currentIndex = _insights.length - 1; // Loop to the end
       }
       if (!_isPaused) {
+        _preAutoAdvanceHapticPlayed = false;
         _progressAnimationController.forward(from: 0.0);
       }
     });
@@ -175,14 +192,41 @@ class _InsightOfTheDayCardState extends State<InsightOfTheDayCard>
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 6,
-      shadowColor: Colors.black.withValues(alpha:0.2),
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: _buildCardContent(),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.primary.withValues(alpha: 0.10),
+            colorScheme.surfaceContainerHighest.withValues(alpha: isDark ? 0.90 : 0.98),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.40),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.30 : 0.14),
+            blurRadius: _isExpanded ? 22 : 14,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: _buildCardContent(),
+        ),
       ),
     );
   }
@@ -200,40 +244,112 @@ class _InsightOfTheDayCardState extends State<InsightOfTheDayCard>
   }
 
   Widget _buildLoadingState() {
-    return const Column(
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(Icons.lightbulb_outline, color: Colors.amber, size: 28),
-            SizedBox(width: 8),
-            Text('Insight of the Day', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: colorScheme.primary.withValues(alpha: 0.15),
+              ),
+              child: const Icon(Icons.lightbulb_outline, color: Colors.amber, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Insight of the Day',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
+              ),
+            ),
           ],
         ),
-        SizedBox(height: 12),
-        Text('Fetching your daily insight...', style: TextStyle(fontSize: 16, fontStyle: FontStyle.italic)),
-        SizedBox(height: 12),
-        LinearProgressIndicator(),
+        const SizedBox(height: 12),
+        Text(
+          'Fetching your daily insight...',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontStyle: FontStyle.italic,
+            color: colorScheme.onSurface.withValues(alpha: 0.80),
+          ),
+        ),
+        const SizedBox(height: 16),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            backgroundColor: colorScheme.onSurface.withValues(alpha: 0.08),
+            valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildErrorState() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 16)),
-        const SizedBox(height: 8),
-        ElevatedButton(onPressed: _fetchInsights, child: const Text('Retry')),
+        Text(
+          _error!,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: colorScheme.error,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: ElevatedButton(
+            onPressed: _fetchInsights,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colorScheme.error.withValues(alpha: 0.12),
+              foregroundColor: colorScheme.error,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+            ),
+            child: const Text('Retry'),
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildEmptyState() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('No new insights for today.', style: TextStyle(fontSize: 16)),
-        const SizedBox(height: 8),
-        ElevatedButton(onPressed: _fetchInsights, child: const Text('Check for Insights')),
+        Text(
+          'No new insights for today.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurface.withValues(alpha: 0.85),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton(
+            onPressed: _fetchInsights,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: colorScheme.primary,
+              side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.5)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+            ),
+            child: const Text('Check for Insights'),
+          ),
+        ),
       ],
     );
   }
@@ -657,6 +773,7 @@ class _InsightOfTheDayCardState extends State<InsightOfTheDayCard>
   }
 
   void _toggleExpand() {
+    final willExpand = !_isExpanded;
     setState(() {
       _isExpanded = !_isExpanded;
       // Smart pause: pause timer when expanded, resume when collapsed (if not manually paused)
@@ -667,10 +784,17 @@ class _InsightOfTheDayCardState extends State<InsightOfTheDayCard>
         _startTimer();
       }
     });
+    if (willExpand) {
+      HapticFeedback.selectionClick();
+    } else {
+      HapticFeedback.lightImpact();
+    }
   }
 
   Widget _buildInsightDisplay() {
     final insight = _insights[_currentIndex];
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return GestureDetector(
       onHorizontalDragEnd: (details) {
         if (_isExpanded) return; // Disable swipe when expanded
@@ -695,63 +819,202 @@ class _InsightOfTheDayCardState extends State<InsightOfTheDayCard>
           curve: Curves.easeInOut,
           child: Column(
             key: ValueKey<int>(_currentIndex),
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                ScaleTransition(
-                  scale: Tween<double>(begin: 0.9, end: 1.1).animate(_iconAnimationController),
-                  child: const Icon(Icons.lightbulb_outline, color: Colors.amber, size: 28),
-                ),
-                const SizedBox(width: 8),
-                const Text('Insight of the Day', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const Spacer(),
-                Text('${_currentIndex + 1} of ${_insights.length}', style: const TextStyle(color: Colors.grey)),
-                IconButton(
-                  icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
-                  onPressed: _togglePause,
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Text(insight.title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                const SizedBox(width: 8),
-                if (!insight.isRead)
-                  const Chip(
-                    label: Text('NEW'),
-                    backgroundColor: Colors.amber,
-                    padding: EdgeInsets.zero,
-                    labelStyle: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  ScaleTransition(
+                    scale: Tween<double>(begin: 0.9, end: 1.05).animate(_iconAnimationController),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: colorScheme.primary.withValues(alpha: 0.18),
+                      ),
+                      child: const Icon(Icons.lightbulb_outline, color: Colors.amber, size: 20),
+                    ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(insight.description, style: TextStyle(fontSize: 14, color: Colors.grey[700])),
-            if (_isExpanded) _buildExpandedDetails(insight),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(onPressed: () => _showDismissConfirmationDialog(_currentIndex), child: const Text('Dismiss')),
-                const SizedBox(width: 8),
-                ElevatedButton(onPressed: () => _takeAction(insight), child: const Text('Take Action')),
-              ],
-            ),
-            const SizedBox(height: 8),
-            AnimatedBuilder(
-              animation: _progressAnimationController,
-              builder: (context, child) {
-                return LinearProgressIndicator(
-                  value: _progressAnimationController.value,
-                  backgroundColor: Colors.grey[300],
-                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.amber),
-                );
-              },
-            ),
-          ],
-        ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Insight of the Day',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      color: colorScheme.surface.withValues(alpha: 0.70),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${_currentIndex + 1}/${_insights.length}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colorScheme.onSurface.withValues(alpha: 0.75),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(999),
+                          onTap: _togglePause,
+                          child: Padding(
+                            padding: const EdgeInsets.all(2.0),
+                            child: Icon(
+                              _isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                              size: 16,
+                              color: colorScheme.onSurface.withValues(alpha: 0.80),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      insight.title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (!insight.isRead)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        color: colorScheme.secondary.withValues(alpha: 0.20),
+                      ),
+                      child: Text(
+                        'NEW',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.4,
+                          color: colorScheme.secondary,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                insight.description,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface.withValues(alpha: 0.90),
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  color: colorScheme.primary.withValues(alpha: 0.12),
+                ),
+                child: Text(
+                  insight.type,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.primary,
+                    letterSpacing: 0.3,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              if (_isExpanded) _buildExpandedDetails(insight),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => _showDismissConfirmationDialog(_currentIndex),
+                    style: TextButton.styleFrom(
+                      foregroundColor: colorScheme.onSurface.withValues(alpha: 0.80),
+                    ),
+                    child: const Text('Dismiss'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () => _takeAction(insight),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colorScheme.primary,
+                      foregroundColor: colorScheme.onPrimary,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    child: const Text('Take Action'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              AnimatedBuilder(
+                animation: _progressAnimationController,
+                builder: (context, child) {
+                  final theme = Theme.of(context);
+                  final colorScheme = theme.colorScheme;
+                  final progress = _progressAnimationController.value;
+                  const totalSeconds = 8;
+                  int? remainingSeconds;
+                  if (!_isPaused) {
+                    final remaining = (totalSeconds - (progress * totalSeconds)).clamp(0.0, totalSeconds.toDouble());
+                    remainingSeconds = remaining.ceil();
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (!_isExpanded) ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Swipe to see more',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSurface.withValues(alpha: 0.60),
+                              ),
+                            ),
+                            Text(
+                              _isPaused
+                                  ? 'Paused'
+                                  : 'Next tip in ${remainingSeconds ?? totalSeconds}s',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSurface.withValues(alpha: 0.65),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                      ],
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 4,
+                          backgroundColor: colorScheme.onSurface.withValues(alpha: 0.08),
+                          valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
