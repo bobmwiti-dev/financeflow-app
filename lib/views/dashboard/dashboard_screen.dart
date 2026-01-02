@@ -643,6 +643,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               _buildBankSmsImportBanner(),
             ],
 
+            // Insight of the Day should be the first card after greeting
+            InsightOfTheDayCard(
+              selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1),
+            ),
+            const SizedBox(height: 8),
+
             // This month at a glance
             EnhancedMonthlySummary(
               selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1),
@@ -690,9 +696,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               showAllAccounts: false, // Show only default account on dashboard
             ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
             const SizedBox(height: 16),
-
-            InsightOfTheDayCard(selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1)),
-            const SizedBox(height: 8),
 
             // M-Pesa Import Card
             const MpesaImportCard().animate().fadeIn(delay: 225.ms, duration: 400.ms),
