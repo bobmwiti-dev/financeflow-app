@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 class FinancialSummaryCard extends StatefulWidget {
@@ -79,6 +80,9 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
+
         return Transform.translate(
           offset: Offset(0, _slideAnimation.value * 50),
           child: Opacity(
@@ -89,16 +93,19 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Colors.white,
-                    Colors.grey.shade50,
+                    colorScheme.surface,
+                    colorScheme.surfaceContainerHighest,
                   ],
                 ),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha:0.6),
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha:0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
+                    color: colorScheme.shadow.withValues(alpha:0.08),
+                    blurRadius: 28,
+                    offset: const Offset(0, 16),
                   ),
                 ],
               ),
@@ -124,18 +131,32 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
   }
 
   Widget _buildTrendIndicators() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final availableMonths = _calculateAvailableDataMonths();
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Colors.indigo.shade50, Colors.purple.shade50],
+          colors: [
+            colorScheme.surface,
+            colorScheme.surfaceContainerHighest,
+          ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.indigo.shade100),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,10 +169,9 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
                 flex: 4,
                 child: Text(
                   'Spending Trends',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.indigo.shade800,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
                   ),
                   overflow: TextOverflow.visible,
                   softWrap: false,
@@ -161,22 +181,22 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: availableMonths == 0 
-                      ? Colors.red.withValues(alpha: 0.2)
-                      : (availableMonths >= 3 
-                          ? Colors.green.withValues(alpha: 0.2)
-                          : Colors.orange.withValues(alpha: 0.2)),
+                  color: availableMonths == 0
+                      ? colorScheme.error.withValues(alpha: 0.12)
+                      : (availableMonths >= 3
+                          ? colorScheme.primary.withValues(alpha: 0.12)
+                          : colorScheme.tertiary.withValues(alpha: 0.12)),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   availableMonths == 0 ? 'Limited' : '${availableMonths}M',
                   style: TextStyle(
                     fontSize: 11,
-                    color: availableMonths == 0 
-                        ? Colors.red[700]
-                        : (availableMonths >= 3 
-                            ? Colors.green[700]
-                            : Colors.orange[700]),
+                    color: availableMonths == 0
+                        ? colorScheme.error
+                        : (availableMonths >= 3
+                            ? colorScheme.primary
+                            : colorScheme.tertiary),
                     fontWeight: FontWeight.w500,
                   ),
                   overflow: TextOverflow.clip,
@@ -254,12 +274,22 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
             ? (changePercentage >= 0 ? '+${changePercentage.toStringAsFixed(1)}%' : '${changePercentage.toStringAsFixed(1)}%')
             : 'No data';
         
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withValues(alpha: 0.04),
+            color.withValues(alpha: 0.16),
+          ],
+        ),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -271,7 +301,7 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
               Icon(
                 hasData ? Icons.trending_up : Icons.info_outline, 
                 size: 12, 
-                color: hasData ? color : Colors.grey.shade500
+                color: hasData ? color : colorScheme.onSurfaceVariant,
               ),
               const SizedBox(width: 3),
               Expanded(
@@ -280,7 +310,7 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w500,
-                    color: Colors.grey.shade700,
+                    color: colorScheme.onSurfaceVariant,
                   ),
                   overflow: TextOverflow.visible,
                   softWrap: true,
@@ -294,7 +324,7 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Colors.grey.shade800,
+              color: colorScheme.onSurface,
             ),
             overflow: TextOverflow.ellipsis,
           ),
@@ -306,7 +336,7 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
               fontWeight: FontWeight.w500,
               color: hasData 
                   ? (changePercentage >= 0 ? Colors.green : Colors.red)
-                  : Colors.grey.shade500,
+                  : colorScheme.onSurfaceVariant,
             ),
             overflow: TextOverflow.ellipsis,
           ),
@@ -356,12 +386,22 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
     
     final isAccelerating = velocity > 0;
     
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.orange.withValues(alpha: 0.04),
+            Colors.orange.withValues(alpha: 0.16),
+          ],
+        ),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -382,7 +422,7 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
-                    color: Colors.grey.shade700,
+                    color: colorScheme.onSurfaceVariant,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -397,7 +437,7 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Colors.grey.shade800,
+              color: colorScheme.onSurface,
             ),
             overflow: TextOverflow.ellipsis,
           ),
@@ -410,7 +450,7 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
               fontSize: 10,
               fontWeight: FontWeight.w500,
               color: expenseData.length < 2 
-                  ? Colors.grey.shade500
+                  ? colorScheme.onSurfaceVariant
                   : (isAccelerating ? Colors.red : Colors.green),
             ),
             overflow: TextOverflow.ellipsis,
@@ -421,24 +461,26 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
   }
 
   Widget _buildViewSelector() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
           Text(
             'Analytics View',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey.shade800,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: colorScheme.onSurface,
             ),
           ),
           const Spacer(),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade300),
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.6)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -455,18 +497,19 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
 
   Widget _buildViewButton(String label, int index, IconData icon) {
     final isSelected = _selectedView == index;
-    
+
     return GestureDetector(
       onTap: () {
+        HapticFeedback.selectionClick();
         setState(() {
           _selectedView = index;
         });
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? Colors.indigo.shade600 : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(999),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -968,6 +1011,9 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
   }
 
   Widget _buildHeader(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -976,17 +1022,15 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
           children: [
             Text(
               'Financial Summary',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey.shade800,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: colorScheme.onSurface,
               ),
             ),
             Text(
               DateFormat('MMMM yyyy').format(widget.selectedMonth ?? DateTime.now()),
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade600,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -996,7 +1040,7 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
             IconButton(
               icon: Icon(
                 _isExpanded ? Icons.expand_less : Icons.expand_more,
-                color: Colors.blue.shade600,
+                color: colorScheme.primary,
               ),
               tooltip: _isExpanded ? 'Collapse' : 'Expand',
               onPressed: () {
