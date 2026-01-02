@@ -28,13 +28,75 @@ class _SpendingTrendChartState extends State<SpendingTrendChart> {
       future: _spendingHistoryFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          final theme = Theme.of(context);
+          final colorScheme = theme.colorScheme;
+          return Card(
+            elevation: 0,
+            margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: theme.dividerColor.withValues(alpha: 0.4),
+                width: 1,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.show_chart,
+                          color: colorScheme.primary,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Monthly Spending Trend',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Loading last 12 months…',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7) ??
+                                  Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  LinearProgressIndicator(
+                    backgroundColor: colorScheme.onSurface.withValues(alpha: 0.08),
+                    valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
+                  ),
+                ],
+              ),
+            ),
+          );
         }
         if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
           return const SizedBox.shrink(); // Hide the widget instead of showing error message
         }
 
         final spendingData = snapshot.data!;
+        final amountFormat = NumberFormat.compactCurrency(symbol: 'KSh ', decimalDigits: 0);
         List<FlSpot> spots = [];
         List<String> monthLabels = [];
         double maxY = 0;
@@ -57,10 +119,29 @@ class _SpendingTrendChartState extends State<SpendingTrendChart> {
         }
         
         if (spots.isEmpty) {
-            return const Center(child: Text('Not enough data for trend chart.'));
+          return const SizedBox.shrink();
         }
         final theme = Theme.of(context);
         final colorScheme = theme.colorScheme;
+
+        final currentTotal = spots.last.y;
+        final previousTotal = spots.length > 1 ? spots[spots.length - 2].y : null;
+        String summaryText = 'Showing last ${spots.length} months of spending.';
+        Color summaryColor = colorScheme.onSurface.withValues(alpha: 0.75);
+
+        if (previousTotal != null && previousTotal > 0) {
+          final diff = currentTotal - previousTotal;
+          final pct = (diff / previousTotal) * 100;
+          if (diff > 0) {
+            summaryText = 'Up ${amountFormat.format(diff)} (${pct.toStringAsFixed(1)}%) vs last month.';
+            summaryColor = colorScheme.error.withValues(alpha: 0.9);
+          } else if (diff < 0) {
+            summaryText = 'Down ${amountFormat.format(diff.abs())} (${pct.abs().toStringAsFixed(1)}%) vs last month.';
+            summaryColor = colorScheme.primary.withValues(alpha: 0.9);
+          } else {
+            summaryText = 'Spending is flat compared to last month.';
+          }
+        }
 
         return Card(
           elevation: 0,
@@ -68,7 +149,7 @@ class _SpendingTrendChartState extends State<SpendingTrendChart> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(
-              color: theme.dividerColor.withValues(alpha: 0.6),
+              color: colorScheme.outlineVariant.withValues(alpha: 0.6),
               width: 1,
             ),
           ),
@@ -103,7 +184,7 @@ class _SpendingTrendChartState extends State<SpendingTrendChart> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Last 12 months',
+                          'Last ${spots.length} months',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7) ??
                                 Colors.grey,
@@ -112,6 +193,13 @@ class _SpendingTrendChartState extends State<SpendingTrendChart> {
                       ],
                     ),
                   ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  summaryText,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: summaryColor,
+                  ),
                 ),
                 const SizedBox(height: 20),
                 Container(
@@ -182,7 +270,7 @@ class _SpendingTrendChartState extends State<SpendingTrendChart> {
                                 reservedSize: 50,
                                 getTitlesWidget: (value, meta) {
                                   return Text(
-                                    NumberFormat.compact().format(value),
+                                    amountFormat.format(value),
                                     style: const TextStyle(fontSize: 10),
                                   );
                                 },
@@ -202,6 +290,30 @@ class _SpendingTrendChartState extends State<SpendingTrendChart> {
                           maxY: maxY == 0
                               ? 500
                               : (maxY * 1.1).ceilToDouble(), // Add some padding to max Y
+                          lineTouchData: LineTouchData(
+                            enabled: true,
+                            touchTooltipData: LineTouchTooltipData(
+                              getTooltipColor: (_) => colorScheme.surface.withValues(alpha: 0.95),
+                              tooltipRoundedRadius: 8,
+                              getTooltipItems: (spots) {
+                                return spots.map((touchedSpot) {
+                                  final index = touchedSpot.x.toInt();
+                                  final label = (index >= 0 && index < monthLabels.length)
+                                      ? monthLabels[index]
+                                      : '';
+                                  final value = touchedSpot.y;
+                                  final textStyle = theme.textTheme.labelSmall?.copyWith(
+                                        color: colorScheme.onSurface,
+                                      ) ??
+                                      const TextStyle(fontSize: 11, color: Colors.black);
+                                  return LineTooltipItem(
+                                    '$label\n${amountFormat.format(value)}',
+                                    textStyle,
+                                  );
+                                }).toList();
+                              },
+                            ),
+                          ),
                           lineBarsData: [
                             LineChartBarData(
                               spots: spots,
