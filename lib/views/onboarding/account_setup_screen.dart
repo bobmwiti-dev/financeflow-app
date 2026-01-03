@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 
 import '../../models/account_model.dart';
 import '../../viewmodels/account_viewmodel.dart';
-import '../../themes/app_theme.dart';
 
 /// Account setup screen for onboarding new users
 class AccountSetupScreen extends StatefulWidget {
@@ -210,116 +209,194 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.isOnboarding ? 'Account Setup' : 'Add Account'),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
+        title: Text(
+          widget.isOnboarding ? 'Account Setup' : 'Add Account',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        elevation: 0,
         leading: _currentPage > 0 
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
-                onPressed: _previousPage,
+                onPressed: () {
+                  HapticFeedback.selectionClick();
+                  _previousPage();
+                },
               )
             : (widget.isOnboarding ? null : IconButton(
                 icon: const Icon(Icons.close),
                 onPressed: () => Navigator.of(context).pop(),
               )),
       ),
-      body: Column(
-        children: [
-          // Progress indicator
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: List.generate(3, (index) {
-                return Expanded(
-                  child: Container(
-                    height: 4,
-                    margin: EdgeInsets.only(right: index < 2 ? 8 : 0),
-                    decoration: BoxDecoration(
-                      color: index <= _currentPage 
-                          ? AppTheme.primaryColor 
-                          : Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              colorScheme.primary.withValues(alpha: 0.04),
+              theme.scaffoldBackgroundColor,
+            ],
+          ),
+        ),
+        child: Column(
+          children: [
+            // Progress indicator
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: List.generate(3, (index) {
+                  final isActive = index <= _currentPage;
+                  return Expanded(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      height: 4,
+                      margin: EdgeInsets.only(right: index < 2 ? 8 : 0),
+                      decoration: BoxDecoration(
+                        gradient: isActive
+                            ? LinearGradient(
+                                colors: [
+                                  colorScheme.primary,
+                                  colorScheme.primaryContainer,
+                                ],
+                              )
+                            : null,
+                        color: isActive
+                            ? null
+                            : colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
+                  );
+                }),
+              ),
+            ),
+            
+            // Page content
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (page) => setState(() => _currentPage = page),
+                children: [
+                  _buildAccountTypePage(),
+                  _buildAccountDetailsPage(),
+                  _buildBalanceSetupPage(),
+                ],
+              ),
+            ),
+            
+            // Bottom navigation
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
                   ),
-                );
-              }),
-            ),
-          ),
-          
-          // Page content
-          Expanded(
-            child: PageView(
-              controller: _pageController,
-              onPageChanged: (page) => setState(() => _currentPage = page),
-              children: [
-                _buildAccountTypePage(),
-                _buildAccountDetailsPage(),
-                _buildBalanceSetupPage(),
-              ],
-            ),
-          ),
-          
-          // Bottom navigation
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                if (_currentPage > 0)
+                ],
+              ),
+              child: Row(
+                children: [
+                  if (_currentPage > 0)
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          HapticFeedback.selectionClick();
+                          _previousPage();
+                        },
+                        child: const Text('Back'),
+                      ),
+                    ),
+                  if (_currentPage > 0) const SizedBox(width: 16),
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: _previousPage,
-                      child: const Text('Back'),
+                    child: ElevatedButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              HapticFeedback.selectionClick();
+                              _nextPage();
+                            },
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(_currentPage == 2 ? 'Create Account' : 'Next'),
                     ),
                   ),
-                if (_currentPage > 0) const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _nextPage,
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(_currentPage == 2 ? 'Create Account' : 'Next'),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildAccountTypePage() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'What type of account would you like to add?',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
+              color: colorScheme.onSurface,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Choose the type that best matches your financial account.',
-            style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: 16,
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 32),
           
           Expanded(
             child: ListView(
               children: AccountType.values.map((type) {
-                return Card(
+                final isSelected = type == _selectedAccountType;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
                   margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? colorScheme.primary.withValues(alpha: 0.08)
+                        : colorScheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isSelected
+                          ? colorScheme.primary.withValues(alpha: 0.5)
+                          : colorScheme.outlineVariant.withValues(alpha: 0.3),
+                    ),
+                  ),
                   child: RadioListTile<AccountType>(
                     value: type,
                     groupValue: _selectedAccountType,
+                    activeColor: colorScheme.primary,
                     onChanged: (value) {
+                      HapticFeedback.selectionClick();
                       setState(() {
                         _selectedAccountType = value!;
                         _setDefaultAccountName();
@@ -327,10 +404,21 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
                     },
                     title: Text(
                       type.displayName,
-                      style: const TextStyle(fontWeight: FontWeight.w500),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
+                      ),
                     ),
-                    subtitle: Text(_getAccountTypeDescription(type)),
-                    secondary: Icon(_getAccountTypeIcon(type)),
+                    subtitle: Text(
+                      _getAccountTypeDescription(type),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    secondary: Icon(
+                      _getAccountTypeIcon(type),
+                      color: colorScheme.primary,
+                    ),
                   ),
                 );
               }).toList(),
@@ -342,19 +430,30 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
   }
 
   Widget _buildAccountDetailsPage() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Account Details',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
+              color: colorScheme.onSurface,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Provide some basic information about your ${_selectedAccountType.displayName.toLowerCase()}.',
-            style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: 16,
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 32),
           
@@ -447,19 +546,30 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
   }
 
   Widget _buildBalanceSetupPage() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Starting Balance',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
+              color: colorScheme.onSurface,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Enter your current balance to start tracking from the right baseline.',
-            style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: 16,
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 32),
           
