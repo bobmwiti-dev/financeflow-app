@@ -2,6 +2,8 @@ import 'package:provider/provider.dart';
 import 'package:financeflow_app/viewmodels/bill_viewmodel.dart';
 import 'package:financeflow_app/viewmodels/insights_viewmodel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:financeflow_app/utils/currency_extensions.dart';
 import 'package:financeflow_app/models/bill_model.dart';
@@ -40,23 +42,27 @@ class _UpcomingBillsCardState extends State<UpcomingBillsCard> {
     return FutureBuilder<List<Bill>>(
       future: _upcomingFuture,
       builder: (context, snapshot) {
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
+
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator.adaptive());
         }
         if (snapshot.hasError) {
-          return Card(
-            margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+          return _buildBaseSurface(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Text('Error loading upcoming bills: ${snapshot.error}'),
-            )
+              child: Text(
+                'Error loading upcoming bills: ${snapshot.error}',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.error,
+                ),
+              ),
+            ),
           );
         }
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Card(
-            elevation: 2,
-            margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          return _buildBaseSurface(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -64,15 +70,28 @@ class _UpcomingBillsCardState extends State<UpcomingBillsCard> {
                 children: [
                   Text(
                     'Bills & Subscriptions',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                      color: colorScheme.onSurface,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   Center(
                     child: Column(
                       children: [
-                        Icon(Icons.event_busy, size: 40, color: Theme.of(context).disabledColor),
+                        Icon(
+                          Icons.event_busy,
+                          size: 40,
+                          color: colorScheme.outlineVariant,
+                        ),
                         const SizedBox(height: 8),
-                        Text('No upcoming bills found.', style: TextStyle(color: Theme.of(context).disabledColor)),
+                        Text(
+                          'No upcoming bills found.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -87,10 +106,7 @@ class _UpcomingBillsCardState extends State<UpcomingBillsCard> {
             .where((b) => b.dueDate.difference(now).inDays <= 7 && b.dueDate.isAfter(now.subtract(const Duration(days:1))))
             .toList();
         if (bills.isEmpty) {
-          return Card(
-            elevation: 2,
-            margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          return _buildBaseSurface(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -98,15 +114,28 @@ class _UpcomingBillsCardState extends State<UpcomingBillsCard> {
                 children: [
                   Text(
                     'Bills & Subscriptions',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                      color: colorScheme.onSurface,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   Center(
                     child: Column(
                       children: [
-                        Icon(Icons.event_busy, size: 40, color: Theme.of(context).disabledColor),
+                        Icon(
+                          Icons.event_busy,
+                          size: 40,
+                          color: colorScheme.outlineVariant,
+                        ),
                         const SizedBox(height: 8),
-                        Text('No bills or subscriptions in the next 7 days.', style: TextStyle(color: Theme.of(context).disabledColor)),
+                        Text(
+                          'No bills or subscriptions in the next 7 days.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -116,10 +145,7 @@ class _UpcomingBillsCardState extends State<UpcomingBillsCard> {
           );
         }
 
-        return Card(
-          elevation: 2,
-          margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        return _buildBaseSurface(
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -132,7 +158,11 @@ class _UpcomingBillsCardState extends State<UpcomingBillsCard> {
                       children: [
                         Text(
                           'Bills & Subscriptions',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                            color: colorScheme.onSurface,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Consumer<InsightsViewModel>(
@@ -159,6 +189,9 @@ class _UpcomingBillsCardState extends State<UpcomingBillsCard> {
                               decoration: BoxDecoration(
                                 color: colorScheme.primary.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: colorScheme.primary.withValues(alpha: 0.2),
+                                ),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -171,7 +204,7 @@ class _UpcomingBillsCardState extends State<UpcomingBillsCard> {
                                   const SizedBox(width: 4),
                                   Text(
                                     'New subscriptions detected',
-                                    style: TextStyle(
+                                    style: theme.textTheme.labelSmall?.copyWith(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
                                       color: colorScheme.primary,
@@ -187,9 +220,27 @@ class _UpcomingBillsCardState extends State<UpcomingBillsCard> {
                     if (bills.length > 3) // Or some other logic if you want 'View All' always
                       TextButton(
                         onPressed: () {
+                          HapticFeedback.selectionClick();
                           Navigator.pushNamed(context, AppConstants.scheduledPaymentsRoute);
                         },
-                        child: const Text('View All'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: colorScheme.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'View All',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.arrow_forward_ios, size: 12),
+                          ],
+                        ),
                       ),
                   ],
                 ),
@@ -204,24 +255,42 @@ class _UpcomingBillsCardState extends State<UpcomingBillsCard> {
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: CircleAvatar(
-                        backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-                        child: Icon(Icons.receipt_long, color: Theme.of(context).colorScheme.onSecondaryContainer),
+                        backgroundColor: colorScheme.secondaryContainer,
+                        child: Icon(
+                          Icons.receipt_long,
+                          color: colorScheme.onSecondaryContainer,
+                        ),
                       ),
-                      title: Text(bill.name, style: const TextStyle(fontWeight: FontWeight.w500)),
-                      subtitle: Text('Due: ${DateFormat('MMM d, yyyy').format(dueDate)}'),
+                      title: Text(
+                        bill.name,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Due: ${DateFormat('MMM d, yyyy').format(dueDate)}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                       trailing: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            bill.amount.toCurrency(),
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.error),
+                            bill.amount.toKenyaDualCurrency(),
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: colorScheme.error,
+                            ),
                           ),
                           const SizedBox(height:4),
                           _buildStatusChip(bill),
                         ],
                       ),
                       onTap: () {
+                        HapticFeedback.selectionClick();
                         Navigator.pushNamed(
                           context,
                           AppConstants.transactionDetailsRoute,
@@ -240,32 +309,96 @@ class _UpcomingBillsCardState extends State<UpcomingBillsCard> {
     );
   }
 
+  Widget _buildBaseSurface({required Widget child}) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.surfaceContainerHighest.withValues(alpha: 0.98),
+            colorScheme.surface.withValues(alpha: 0.98),
+          ],
+        ),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: child,
+    ).animate()
+      .fadeIn(duration: 600.ms)
+      .slideY(begin: 0.3, duration: 600.ms, curve: Curves.easeOutCubic);
+  }
+
   Widget _buildStatusChip(Bill bill) {
     final status = _computeStatus(bill);
-    Color color;
-    Color textColor;
+    final colorScheme = Theme.of(context).colorScheme;
+    Color background;
+    Color foreground;
+    IconData icon;
 
     switch (status) {
       case 'Auto-pay':
-        color = Colors.green.shade100;
-        textColor = Colors.green.shade800;
+        background = colorScheme.secondaryContainer;
+        foreground = colorScheme.onSecondaryContainer;
+        icon = Icons.autorenew;
         break;
       case 'Negotiable':
-        color = Colors.orange.shade100;
-        textColor = Colors.orange.shade800;
+        background = colorScheme.tertiaryContainer;
+        foreground = colorScheme.onTertiaryContainer;
+        icon = Icons.tune;
+        break;
+      case 'Consider cancelling':
+        background = colorScheme.errorContainer;
+        foreground = colorScheme.onErrorContainer;
+        icon = Icons.warning_amber_rounded;
         break;
       default:
-        color = Colors.red.shade100;
-        textColor = Colors.red.shade800;
+        background = colorScheme.surfaceContainerHighest;
+        foreground = colorScheme.onSurfaceVariant;
+        icon = Icons.arrow_forward_ios;
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(12),
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: foreground.withValues(alpha: 0.3),
+        ),
       ),
-      child: Text(status, style: TextStyle(fontSize: 10, color: textColor, fontWeight: FontWeight.w500)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 12,
+            color: foreground,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            status,
+            style: TextStyle(
+              fontSize: 10,
+              color: foreground,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
