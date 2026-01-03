@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../../../viewmodels/goal_viewmodel.dart';
@@ -6,6 +7,7 @@ import '../../../viewmodels/transaction_viewmodel_fixed.dart';
 import '../../../viewmodels/income_viewmodel.dart';
 import '../../../models/goal_model.dart';
 import '../../../models/transaction_model.dart';
+import '../../../utils/currency_extensions.dart';
 
 /// Unified Savings Card that combines savings rate tracking and goals management
 class UnifiedSavingsCard extends StatefulWidget {
@@ -77,31 +79,31 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
         final totalSaved = goals.fold<double>(0.0, (sum, goal) => sum + goal.currentAmount);
         final totalTarget = goals.fold<double>(0.0, (sum, goal) => sum + goal.targetAmount);
 
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
+
         return Container(
           width: double.infinity,
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Colors.white, Color(0xFFFDFDFD)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: Colors.grey.withValues(alpha: 0.06),
+              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
               width: 1,
+            ),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                colorScheme.surfaceContainerHighest.withValues(alpha: 0.98),
+                colorScheme.surface.withValues(alpha: 0.98),
+              ],
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-                spreadRadius: 0,
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
                 spreadRadius: 0,
               ),
             ],
@@ -144,12 +146,15 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
   }
 
   Widget _buildHeader() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFF4CAF50).withValues(alpha: 0.03),
+            colorScheme.primary.withValues(alpha: 0.06),
             Colors.transparent,
           ],
           begin: Alignment.topLeft,
@@ -162,15 +167,18 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
+              gradient: LinearGradient(
+                colors: [
+                  colorScheme.primary,
+                  colorScheme.primaryContainer,
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF4CAF50).withValues(alpha: 0.3),
+                  color: colorScheme.primary.withValues(alpha: 0.35),
                   blurRadius: 10,
                   offset: const Offset(0, 3),
                 ),
@@ -191,11 +199,10 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
               children: [
                 Text(
                   'Savings Overview',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.grey[900],
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
                     letterSpacing: -0.2,
+                    color: colorScheme.onSurface,
                   ),
                   overflow: TextOverflow.visible,
                   softWrap: true,
@@ -203,9 +210,9 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
                 const SizedBox(height: 2),
                 Text(
                   _showRate ? 'Track your rate' : 'Manage goals',
-                  style: TextStyle(
+                  style: theme.textTheme.bodySmall?.copyWith(
                     fontSize: 12,
-                    color: Colors.grey[600],
+                    color: colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -225,20 +232,23 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
   }
 
   Widget _buildToggleButtons() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return FittedBox(
       fit: BoxFit.scaleDown,
       alignment: Alignment.centerRight,
       child: Container(
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.withValues(alpha: 0.15)),
+          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.35)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -258,6 +268,7 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
     
     return GestureDetector(
       onTap: () {
+        HapticFeedback.selectionClick();
         setState(() {
           _showRate = isRate;
         });
@@ -300,25 +311,28 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
   }
 
   Widget _buildAnalyticsRow() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Colors.white,
-            const Color(0xFFF8F9FA).withValues(alpha: 0.8),
+            colorScheme.surface,
+            colorScheme.surfaceContainerHighest.withValues(alpha: 0.9),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.08)),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
-            offset: const Offset(0, 2),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -350,6 +364,9 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
   }
 
   Widget _buildAnalyticItem(String label, String value, IconData icon, Color color) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Expanded(
       child: Row(
         children: [
@@ -382,19 +399,19 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
               children: [
                 Text(
                   value,
-                  style: const TextStyle(
+                  style: theme.textTheme.titleSmall?.copyWith(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A1A1A),
+                    color: colorScheme.onSurface,
                     letterSpacing: -0.2,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   label,
-                  style: TextStyle(
+                  style: theme.textTheme.bodySmall?.copyWith(
                     fontSize: 12,
-                    color: Colors.grey[600],
+                    color: colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -407,6 +424,9 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
   }
 
   Widget _buildSavingsRateView() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     final savings = widget.income - widget.expenses;
     final savingsRate = widget.income > 0 ? savings / widget.income : 0.0;
     final targetRate = widget.targetSavingsRate;
@@ -423,15 +443,15 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFF4CAF50).withValues(alpha: 0.1),
-                  const Color(0xFF81C784).withValues(alpha: 0.05),
+                  colorScheme.primary.withValues(alpha: 0.12),
+                  colorScheme.primaryContainer.withValues(alpha: 0.06),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: const Color(0xFF4CAF50).withValues(alpha: 0.2),
+                color: colorScheme.primary.withValues(alpha: 0.25),
                 width: 1,
               ),
             ),
@@ -445,18 +465,18 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
                       children: [
                         Text(
                           'Current Rate',
-                          style: TextStyle(
+                          style: theme.textTheme.bodySmall?.copyWith(
                             fontSize: 14,
-                            color: Colors.grey[600],
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           '${(savingsRate * 100).toStringAsFixed(1)}%',
-                          style: TextStyle(
+                          style: theme.textTheme.headlineSmall?.copyWith(
                             fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: isOnTrack ? const Color(0xFF4CAF50) : const Color(0xFFFF5722),
+                            fontWeight: FontWeight.w800,
+                            color: isOnTrack ? colorScheme.primary : colorScheme.error,
                           ),
                         ),
                       ],
@@ -466,9 +486,9 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
                       children: [
                         Text(
                           'Target: ${(targetRate * 100).toStringAsFixed(0)}%',
-                          style: TextStyle(
+                          style: theme.textTheme.bodySmall?.copyWith(
                             fontSize: 14,
-                            color: Colors.grey[600],
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -476,16 +496,18 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
                             color: isOnTrack 
-                              ? const Color(0xFF4CAF50).withValues(alpha: 0.1)
-                              : const Color(0xFFFF5722).withValues(alpha: 0.1),
+                              ? colorScheme.primaryContainer
+                              : colorScheme.errorContainer,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
                             isOnTrack ? 'On Track' : 'Behind',
-                            style: TextStyle(
+                            style: theme.textTheme.labelSmall?.copyWith(
                               fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: isOnTrack ? const Color(0xFF4CAF50) : const Color(0xFFFF5722),
+                              fontWeight: FontWeight.w700,
+                              color: isOnTrack
+                                  ? colorScheme.onPrimaryContainer
+                                  : colorScheme.onErrorContainer,
                             ),
                           ),
                         ),
@@ -498,7 +520,7 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
                 Container(
                   height: 8,
                   decoration: BoxDecoration(
-                    color: Colors.grey[200],
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.9),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: AnimatedBuilder(
@@ -512,8 +534,9 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
-                                const Color(0xFF4CAF50),
-                                const Color(0xFF81C784),
+                                isOnTrack ? colorScheme.primary : colorScheme.error,
+                                (isOnTrack ? colorScheme.primary : colorScheme.error)
+                                    .withValues(alpha: 0.8),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(4),
@@ -528,9 +551,9 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildAmountItem('Income', widget.income, const Color(0xFF2196F3)),
-                    _buildAmountItem('Expenses', widget.expenses, const Color(0xFFFF5722)),
-                    _buildAmountItem('Saved', savings, const Color(0xFF4CAF50)),
+                    _buildAmountItem('Income', widget.income, colorScheme.primary),
+                    _buildAmountItem('Expenses', widget.expenses, colorScheme.error),
+                    _buildAmountItem('Saved', savings, colorScheme.tertiary),
                   ],
                 ),
               ],
@@ -542,21 +565,24 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
   }
 
   Widget _buildAmountItem(String label, double amount, Color color) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Column(
       children: [
         Text(
           label,
-          style: TextStyle(
+          style: theme.textTheme.bodySmall?.copyWith(
             fontSize: 12,
-            color: Colors.grey[600],
+            color: colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: 4),
         Text(
-          '\$${amount.toStringAsFixed(0)}',
-          style: TextStyle(
+          amount.toKenyaDualCurrency(),
+          style: theme.textTheme.labelLarge?.copyWith(
             fontSize: 16,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w700,
             color: color,
           ),
         ),
@@ -565,6 +591,9 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
   }
 
   Widget _buildGoalsView(List<Goal> goals, bool isLoading, double totalSaved, double totalTarget) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       key: const ValueKey('goals_view'),
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -588,19 +617,19 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
                   });
                 },
                 underline: Container(),
-                style: const TextStyle(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF1A1A1A),
+                  color: colorScheme.onSurface,
                 ),
               ),
               if (totalTarget > 0)
                 Text(
-                  '\$${totalSaved.toStringAsFixed(0)} / \$${totalTarget.toStringAsFixed(0)}',
-                  style: TextStyle(
+                  '${totalSaved.toKenyaDualCurrency()} / ${totalTarget.toKenyaDualCurrency()}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey[600],
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
             ],
@@ -623,6 +652,9 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
   }
 
   Widget _buildEmptyGoalsState() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(32),
       child: Column(
@@ -630,23 +662,23 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
           Icon(
             Icons.flag_outlined,
             size: 48,
-            color: Colors.grey[400],
+            color: colorScheme.outlineVariant,
           ),
           const SizedBox(height: 16),
           Text(
             'No ${_selectedGoalFilter.toLowerCase()} goals',
-            style: TextStyle(
+            style: theme.textTheme.titleMedium?.copyWith(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Colors.grey[600],
+              color: colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Set savings goals to track your progress',
-            style: TextStyle(
+            style: theme.textTheme.bodySmall?.copyWith(
               fontSize: 14,
-              color: Colors.grey[500],
+              color: colorScheme.onSurfaceVariant,
             ),
             textAlign: TextAlign.center,
           ),
@@ -656,6 +688,9 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
   }
 
   Widget _buildGoalsList(List<Goal> goals) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Column(
       children: goals.take(3).map((goal) {
         final index = goals.indexOf(goal);
@@ -675,7 +710,10 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
             }
           },
           child: GestureDetector(
-            onTap: () => widget.onGoalTap?.call(goal),
+            onTap: () {
+              HapticFeedback.selectionClick();
+              widget.onGoalTap?.call(goal);
+            },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               margin: const EdgeInsets.only(bottom: 12),
@@ -701,16 +739,16 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
                       Expanded(
                         child: Text(
                           goal.name,
-                          style: const TextStyle(
+                          style: theme.textTheme.titleSmall?.copyWith(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF1A1A1A),
+                            color: colorScheme.onSurface,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       Text(
-                        '\$${goal.currentAmount.toStringAsFixed(0)} / \$${goal.targetAmount.toStringAsFixed(0)}',
+                        '${goal.currentAmount.toKenyaDualCurrency()} / ${goal.targetAmount.toKenyaDualCurrency()}',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -776,6 +814,9 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
   }
 
   Widget _buildFooter() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -783,11 +824,14 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
         children: [
           if (!_showRate && widget.onViewAllGoals != null)
             TextButton.icon(
-              onPressed: widget.onViewAllGoals,
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                widget.onViewAllGoals?.call();
+              },
               icon: const Icon(Icons.visibility, size: 16),
               label: const Text('View All Goals'),
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF4CAF50),
+                foregroundColor: colorScheme.primary,
               ),
             )
           else
@@ -800,7 +844,7 @@ class _UnifiedSavingsCardState extends State<UnifiedSavingsCard>
             icon: const Icon(Icons.analytics_outlined, size: 16),
             label: const Text('View Details'),
             style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF4CAF50),
+              foregroundColor: colorScheme.primary,
             ),
           ),
         ],
