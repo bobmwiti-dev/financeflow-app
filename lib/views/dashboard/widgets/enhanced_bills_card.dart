@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:logging/logging.dart';
 import '../../../models/bill_reminder_model.dart';
 import '../../../services/bill_service.dart';
 import '../../../utils/category_icons.dart';
+import '../../../utils/currency_extensions.dart';
 
 /// Enhanced Bills & Subscriptions card with smart icons, interactive features, and urgency indicators
 /// Dynamic filtering, animations, and intelligent bill categorization
@@ -82,28 +84,44 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
         final urgentBills = _getUrgentBills(bills);
         final totalUpcoming = bills.where((b) => !b.isPaid && b.dueDate.isAfter(DateTime.now())).length;
 
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
+
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                colorScheme.surfaceContainerHighest.withValues(alpha: 0.98),
+                colorScheme.surface.withValues(alpha: 0.98),
+              ],
+            ),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(urgentBills.length, totalUpcoming),
-              _buildUrgencyIndicator(urgentBills),
-              _buildFilterChips(),
-              _buildBillsList(filteredBills, snapshot.connectionState == ConnectionState.waiting),
-              _buildFooter(),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(urgentBills.length, totalUpcoming),
+                _buildUrgencyIndicator(urgentBills),
+                _buildFilterChips(),
+                _buildBillsList(filteredBills, snapshot.connectionState == ConnectionState.waiting),
+                _buildFooter(),
+              ],
+            ),
           ),
         ).animate()
           .fadeIn(duration: 600.ms)
@@ -113,6 +131,9 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
   }
 
   Widget _buildHeader(int urgentCount, int totalUpcoming) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -121,19 +142,21 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Bills & Subscriptions',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.2,
+                  color: colorScheme.onSurface,
                 ),
               ),
+              const SizedBox(height: 2),
               Text(
-                '$totalUpcoming upcoming bills',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
+                totalUpcoming == 0
+                    ? 'You\'re all caught up'
+                    : '$totalUpcoming upcoming bill${totalUpcoming == 1 ? '' : 's'}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -145,24 +168,27 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    color: colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: colorScheme.error.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        Icons.warning,
-                        color: Colors.red[600],
+                        Icons.warning_amber_rounded,
+                        color: colorScheme.onErrorContainer,
                         size: 14,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         '$urgentCount urgent',
-                        style: TextStyle(
+                        style: theme.textTheme.labelSmall?.copyWith(
                           fontSize: 11,
-                          color: Colors.red[700],
-                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onErrorContainer,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
@@ -176,12 +202,12 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withValues(alpha:0.1),
+                  color: colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   Icons.receipt_long,
-                  color: Colors.blue[600],
+                  color: colorScheme.onPrimaryContainer,
                   size: 20,
                 ),
               ),
@@ -195,31 +221,37 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
   Widget _buildUrgencyIndicator(List<BillReminder> urgentBills) {
     if (urgentBills.isEmpty) return const SizedBox.shrink();
 
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.red.withValues(alpha:0.1), Colors.orange.withValues(alpha:0.1)],
+          colors: [
+            colorScheme.error.withValues(alpha: 0.08),
+            colorScheme.tertiary.withValues(alpha: 0.06),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.withValues(alpha:0.2)),
+        border: Border.all(color: colorScheme.error.withValues(alpha:0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.priority_high, color: Colors.red[600], size: 18),
+              Icon(Icons.priority_high, color: colorScheme.error, size: 18),
               const SizedBox(width: 8),
               Text(
                 'Urgent Bills Requiring Attention',
-                style: TextStyle(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red[700],
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.onSurface,
                 ),
               ),
             ],
@@ -229,9 +261,9 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
           if (urgentBills.length > 2)
             Text(
               '+ ${urgentBills.length - 2} more urgent bills',
-              style: TextStyle(
+              style: theme.textTheme.labelSmall?.copyWith(
                 fontSize: 12,
-                color: Colors.red[600],
+                color: colorScheme.error,
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -241,7 +273,8 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
   }
 
   Widget _buildUrgentBillItem(BillReminder bill) {
-    final currencyFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 0);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final daysOverdue = DateTime.now().difference(bill.dueDate).inDays;
     
     return Padding(
@@ -259,19 +292,20 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              '${bill.title} - ${currencyFormat.format(bill.amount)}',
-              style: const TextStyle(
+              '${bill.title} - ${bill.amount.toKenyaDualCurrency()}',
+              style: theme.textTheme.labelMedium?.copyWith(
                 fontSize: 12,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
               ),
             ),
           ),
           Text(
             daysOverdue > 0 ? '${daysOverdue}d overdue' : 'Due today',
-            style: TextStyle(
+            style: theme.textTheme.labelSmall?.copyWith(
               fontSize: 11,
-              color: Colors.red[600],
-              fontWeight: FontWeight.bold,
+              color: colorScheme.error,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -280,6 +314,9 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
   }
 
   Widget _buildFilterChips() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       height: 50,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -297,17 +334,18 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
               selected: isSelected,
               onSelected: (selected) {
                 if (selected) {
+                  HapticFeedback.selectionClick();
                   setState(() {
                     _selectedFilter = filter;
                   });
                 }
               },
-              backgroundColor: Colors.grey[100],
-              selectedColor: Colors.blue.withValues(alpha: 0.2),
-              checkmarkColor: Colors.blue[700],
-              labelStyle: TextStyle(
-                color: isSelected ? Colors.blue[700] : Colors.grey[700],
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              backgroundColor: colorScheme.surfaceContainerLowest,
+              selectedColor: colorScheme.primary.withValues(alpha: 0.16),
+              checkmarkColor: colorScheme.primary,
+              labelStyle: theme.textTheme.labelMedium?.copyWith(
+                color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 fontSize: 12,
               ),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -322,7 +360,7 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
     if (isLoading) {
       return const Padding(
         padding: EdgeInsets.all(20),
-        child: Center(child: CircularProgressIndicator()),
+        child: Center(child: CircularProgressIndicator.adaptive()),
       );
     }
 
@@ -342,7 +380,8 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
   }
 
   Widget _buildBillTile(BillReminder bill, int index) {
-    final currencyFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 0);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final now = DateTime.now();
     final daysUntilDue = bill.dueDate.difference(now).inDays;
     
@@ -352,27 +391,27 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
     IconData urgencyIcon;
     
     if (bill.isPaid) {
-      urgencyColor = Colors.green;
+      urgencyColor = colorScheme.primary;
       urgencyText = 'Paid';
       urgencyIcon = Icons.check_circle;
     } else if (daysUntilDue < 0) {
-      urgencyColor = Colors.red;
+      urgencyColor = colorScheme.error;
       urgencyText = '${-daysUntilDue}d overdue';
       urgencyIcon = Icons.error;
     } else if (daysUntilDue == 0) {
-      urgencyColor = Colors.orange;
+      urgencyColor = colorScheme.tertiary;
       urgencyText = 'Due today';
       urgencyIcon = Icons.today;
     } else if (daysUntilDue == 1) {
-      urgencyColor = Colors.orange;
+      urgencyColor = colorScheme.tertiary;
       urgencyText = 'Due tomorrow';
       urgencyIcon = Icons.schedule;
     } else if (daysUntilDue <= 3) {
-      urgencyColor = Colors.amber;
+      urgencyColor = colorScheme.secondary;
       urgencyText = 'Due in ${daysUntilDue}d';
       urgencyIcon = Icons.schedule;
     } else {
-      urgencyColor = Colors.grey;
+      urgencyColor = colorScheme.outlineVariant;
       urgencyText = 'Due ${DateFormat.MMMd().format(bill.dueDate)}';
       urgencyIcon = Icons.schedule;
     }
@@ -385,17 +424,20 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
       duration: const Duration(milliseconds: 200),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
-        color: bill.isPaid ? Colors.green.withValues(alpha:0.05) : Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
+        color: bill.isPaid ? colorScheme.surfaceContainerHigh : colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: bill.isPaid ? Colors.green.withValues(alpha:0.2) : 
-                 (daysUntilDue <= 0 ? Colors.red.withValues(alpha:0.3) : Colors.grey[200]!),
+          color: bill.isPaid
+              ? colorScheme.primary.withValues(alpha:0.25)
+              : (daysUntilDue <= 0
+                  ? colorScheme.error.withValues(alpha:0.35)
+                  : colorScheme.outlineVariant.withValues(alpha:0.4)),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -403,7 +445,10 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () => widget.onBillTap?.call(bill),
+          onTap: () {
+            HapticFeedback.selectionClick();
+            widget.onBillTap?.call(bill);
+          },
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -471,7 +516,7 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
                             fontWeight: FontWeight.w700,
                             fontSize: 16,
                             decoration: bill.isPaid ? TextDecoration.lineThrough : null,
-                            color: bill.isPaid ? Colors.grey[600] : Colors.black87,
+                            color: bill.isPaid ? colorScheme.onSurfaceVariant : colorScheme.onSurface,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -537,11 +582,12 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        currencyFormat.format(bill.amount),
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
+                        bill.amount.toKenyaDualCurrency(),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w900,
                           fontSize: 18,
-                          color: bill.isPaid ? Colors.grey[600] : Colors.black87,
+                          letterSpacing: -0.1,
+                          color: bill.isPaid ? colorScheme.onSurfaceVariant : colorScheme.onSurface,
                           decoration: bill.isPaid ? TextDecoration.lineThrough : null,
                         ),
                       ),
@@ -555,13 +601,13 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
-                                  Colors.green.withValues(alpha: 0.1),
-                                  Colors.green.withValues(alpha: 0.05),
+                                  colorScheme.primary.withValues(alpha: 0.1),
+                                  colorScheme.primary.withValues(alpha: 0.05),
                                 ],
                               ),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: Colors.green.withValues(alpha: 0.3),
+                                color: colorScheme.primary.withValues(alpha: 0.3),
                                 width: 1,
                               ),
                             ),
@@ -571,14 +617,14 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
                                 Icon(
                                   Icons.check_circle_outline,
                                   size: 14,
-                                  color: Colors.green[700],
+                                  color: colorScheme.primary,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Mark Paid',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: Colors.green[700],
+                                    color: colorScheme.primary,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -603,6 +649,9 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
   }
 
   Widget _buildEmptyState() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(32),
       child: Column(
@@ -611,43 +660,44 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: colorScheme.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(40),
             ),
             child: Icon(
               Icons.receipt_long_outlined,
               size: 40,
-              color: Colors.grey[400],
+              color: colorScheme.primary,
             ),
           ),
           const SizedBox(height: 16),
           Text(
             _getEmptyStateTitle(),
-            style: TextStyle(
+            style: theme.textTheme.titleMedium?.copyWith(
               fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
+              fontWeight: FontWeight.w700,
+              color: colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             _getEmptyStateSubtitle(),
-            style: TextStyle(
+            style: theme.textTheme.bodyMedium?.copyWith(
               fontSize: 14,
-              color: Colors.grey[500],
+              color: colorScheme.onSurfaceVariant,
             ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
           ElevatedButton.icon(
             onPressed: () {
+              HapticFeedback.selectionClick();
               Navigator.pushNamed(context, '/add_bill');
             },
             icon: const Icon(Icons.add),
             label: const Text('Add Bill'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue[600],
-              foregroundColor: Colors.white,
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -660,6 +710,9 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
   }
 
   Widget _buildFooter() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -667,9 +720,9 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
         children: [
           Text(
             'Smart bill tracking & reminders',
-            style: TextStyle(
+            style: theme.textTheme.labelSmall?.copyWith(
               fontSize: 11,
-              color: Colors.grey[500],
+              color: colorScheme.onSurfaceVariant,
               fontStyle: FontStyle.italic,
             ),
           ),
@@ -677,7 +730,7 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
             TextButton(
               onPressed: widget.onViewAllBills,
               style: TextButton.styleFrom(
-                foregroundColor: Colors.blue[700],
+                foregroundColor: colorScheme.primary,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
               child: const Row(
