@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -12,6 +13,7 @@ import '../../../models/transaction_model.dart';
 import '../../../services/navigation_service.dart';
 import '../../../constants/app_constants.dart';
 import '../../../services/analytics_service.dart';
+import '../../../utils/currency_extensions.dart';
 
 class BudgetAdherenceCard extends StatefulWidget {
   final DateTime? selectedMonth;
@@ -81,6 +83,8 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
   Widget build(BuildContext context) {
     return Consumer2<BudgetViewModel, fixed.TransactionViewModel>(
       builder: (context, budgetVm, transactionVm, child) {
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
         final selectedMonth = widget.selectedMonth ?? DateTime.now();
         _logger.info('Building BudgetAdherenceCard for month: ${DateFormat('yyyy-MM').format(selectedMonth)}');
         
@@ -111,8 +115,10 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
           return budget.copyWith(spent: realSpent);
         }).toList();
         
-        final double totalBudget = budgetsWithRealData.fold(0.0, (sum, b) => sum + b.amount);
-        final double totalSpent = budgetsWithRealData.fold(0.0, (sum, b) => sum + b.spent);
+        final double totalBudget =
+            budgetsWithRealData.fold(0.0, (sum, b) => sum + b.amount);
+        final double totalSpent =
+            budgetsWithRealData.fold(0.0, (sum, b) => sum + b.spent);
         final double ratio = totalBudget > 0 ? totalSpent / totalBudget : 0;
         
         _logger.info('Total budget: KES ${totalBudget.toStringAsFixed(2)}, Total spent: KES ${totalSpent.toStringAsFixed(2)}, Ratio: ${(ratio * 100).toStringAsFixed(1)}%');
@@ -130,14 +136,12 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
         final oversTop = budgetsWithRealData
             .where((b) => b.spent > b.amount)
             .toList()
-            ..sort((a, b) => (b.spent - b.amount).compareTo(a.spent - a.amount));
+          ..sort((a, b) => (b.spent - b.amount).compareTo(a.spent - a.amount));
         
         final undersTop = budgetsWithRealData
             .where((b) => b.spent <= b.amount)
             .toList()
-            ..sort((a, b) => (a.amount - a.spent).compareTo(b.amount - b.spent));
-        
-        final currency = NumberFormat.currency(symbol: 'KES ', decimalDigits: 0);
+          ..sort((a, b) => (a.amount - a.spent).compareTo(b.amount - b.spent));
         
         // Calculate days until next payday (assuming monthly salary on 1st)
         final now = DateTime.now();
@@ -162,19 +166,52 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeInOut,
                 constraints: const BoxConstraints(minWidth: double.infinity),
-                child: Card(
-                  elevation: 2,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildHeader(ratio, selectedMonth),
-                      _buildProgressBar(ratio, context),
-                      _buildLegendRow(ratio),
-                      _buildSummaryContainer(currency, totalSpent, totalBudget, ratio),
-                      if (_isExpanded) ..._buildExpandedContent(oversTop, undersTop, currency, selectedMonth),
-                      _buildPayDayContainer(daysLeft),
-                      _buildAlertSummary(budgetsWithRealData),
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: LinearGradient(
+                      colors: [
+                        colorScheme.surface,
+                        colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.9),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    border: Border.all(
+                      color: colorScheme.outlineVariant
+                          .withValues(alpha: 0.6),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: colorScheme.shadow.withValues(alpha: 0.25),
+                        blurRadius: 18,
+                        offset: const Offset(0, 10),
+                      ),
                     ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildHeader(context, ratio, selectedMonth),
+                        _buildProgressBar(ratio, context),
+                        _buildLegendRow(context, ratio),
+                        _buildSummaryContainer(context, totalSpent, totalBudget, ratio),
+                        if (_isExpanded)
+                          ..._buildExpandedContent(
+                            context,
+                            oversTop,
+                            undersTop,
+                            selectedMonth,
+                          ),
+                        _buildPayDayContainer(context, daysLeft),
+                        _buildAlertSummary(context, budgetsWithRealData),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -263,21 +300,23 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
     );
   }
 
-  Widget _buildHeader(double ratio, DateTime selectedMonth) {
+  Widget _buildHeader(BuildContext context, double ratio, DateTime selectedMonth) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     Color statusColor;
     IconData statusIcon;
     String statusText;
     
     if (ratio <= 0.8) {
-      statusColor = Colors.green;
+      statusColor = colorScheme.primary;
       statusIcon = Icons.check_circle;
       statusText = 'On Track';
     } else if (ratio <= 1.0) {
-      statusColor = Colors.orange;
+      statusColor = colorScheme.tertiary;
       statusIcon = Icons.warning;
       statusText = 'Near Limit';
     } else {
-      statusColor = Colors.red;
+      statusColor = colorScheme.error;
       statusIcon = Icons.error;
       statusText = 'Over Budget';
     }
@@ -291,7 +330,7 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: statusColor.withValues(alpha:0.1),
+              color: statusColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
@@ -305,29 +344,26 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Budget Adherence',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 Row(
                   children: [
                     Text(
                       statusText,
-                      style: TextStyle(
+                      style: theme.textTheme.labelSmall?.copyWith(
                         color: statusColor,
-                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       '• $monthName',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 12,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -336,18 +372,20 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
             ),
           ),
           GestureDetector(
-            onTap: () => NavigationService.navigateTo(AppConstants.budgetsRoute),
+            onTap: () {
+              HapticFeedback.selectionClick();
+              NavigationService.navigateTo(AppConstants.budgetsRoute);
+            },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withValues(alpha:0.1),
+                color: colorScheme.primaryContainer.withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 'Manage',
-                style: TextStyle(
-                  color: Theme.of(context).primaryColor,
-                  fontSize: 12,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onPrimaryContainer,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -376,12 +414,13 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
   }
 
   Widget _buildProgressBar(double ratio, BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       height: 16,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
-        color: Colors.grey.shade200,
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -399,18 +438,25 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
                       borderRadius: BorderRadius.circular(8),
                       gradient: LinearGradient(
                         colors: ratio > 1.0
-                            ? [Colors.red.shade400, Colors.red.shade600]
+                            ? [colorScheme.error, colorScheme.error.withValues(alpha: 0.8)]
                             : ratio > 0.75
-                                ? [Colors.orange.shade400, Colors.orange.shade600]
-                                : [Colors.green.shade400, Colors.green.shade600],
+                                ? [
+                                    colorScheme.tertiary,
+                                    colorScheme.tertiary.withValues(alpha: 0.8),
+                                  ]
+                                : [
+                                    colorScheme.primary,
+                                    colorScheme.primary.withValues(alpha: 0.8),
+                                  ],
                       ),
                       boxShadow: [
                         BoxShadow(
                           color: (ratio > 1.0
-                              ? Colors.red
-                              : ratio > 0.75
-                                  ? Colors.orange
-                                  : Colors.green).withValues(alpha: 0.3),
+                                  ? colorScheme.error
+                                  : ratio > 0.75
+                                      ? colorScheme.tertiary
+                                      : colorScheme.primary)
+                              .withValues(alpha: 0.3),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -446,15 +492,27 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
     );
   }
 
-  Widget _buildLegendRow(double ratio) {
+  Widget _buildLegendRow(BuildContext context, double ratio) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Flexible(child: _buildLegendDot(Colors.green, 'Good', ratio <= 0.75)),
-          Flexible(child: _buildLegendDot(Colors.orange, 'Caution', ratio > 0.75 && ratio <= 1.0)),
-          Flexible(child: _buildLegendDot(Colors.red, 'Over', ratio > 1.0)),
+          Flexible(
+            child: _buildLegendDot(colorScheme.primary, 'Good', ratio <= 0.75),
+          ),
+          Flexible(
+            child: _buildLegendDot(
+              colorScheme.tertiary,
+              'Caution',
+              ratio > 0.75 && ratio <= 1.0,
+            ),
+          ),
+          Flexible(
+            child:
+                _buildLegendDot(colorScheme.error, 'Over', ratio > 1.0),
+          ),
         ],
       ),
     );
@@ -497,13 +555,22 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
     );
   }
 
-  Widget _buildSummaryContainer(NumberFormat currency, double totalSpent, double totalBudget, double ratio) {
+  Widget _buildSummaryContainer(
+    BuildContext context,
+    double totalSpent,
+    double totalBudget,
+    double ratio,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.7),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
       ),
       child: Column(
         children: [
@@ -515,19 +582,18 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
                 children: [
                   Text(
                     'Spent',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    currency.format(totalSpent),
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: ratio > 1.0 ? Colors.red.shade600 : Colors.grey.shade800,
+                    totalSpent.toKenyaDualCurrency(),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color:
+                          ratio > 1.0 ? colorScheme.error : colorScheme.onSurface,
                     ),
                   ),
                 ],
@@ -537,9 +603,8 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
                 children: [
                   Text(
                     'Progress',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -548,22 +613,21 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: ratio > 1.0
-                          ? Colors.red.shade100
+                          ? colorScheme.errorContainer
                           : ratio > 0.75
-                              ? Colors.orange.shade100
-                              : Colors.green.shade100,
+                              ? colorScheme.tertiaryContainer
+                              : colorScheme.primaryContainer,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       '${(ratio * 100).toStringAsFixed(0)}%',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
                         color: ratio > 1.0
-                            ? Colors.red.shade700
+                            ? colorScheme.onErrorContainer
                             : ratio > 0.75
-                                ? Colors.orange.shade700
-                                : Colors.green.shade700,
+                                ? colorScheme.onTertiaryContainer
+                                : colorScheme.onPrimaryContainer,
                       ),
                     ),
                   ),
@@ -574,19 +638,17 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
                 children: [
                   Text(
                     'Budget',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    currency.format(totalBudget),
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade800,
+                    totalBudget.toKenyaDualCurrency(),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurface,
                     ),
                   ),
                 ],
@@ -600,17 +662,20 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
               Icon(
                 totalBudget - totalSpent >= 0 ? Icons.savings : Icons.warning,
                 size: 16,
-                color: totalBudget - totalSpent >= 0 ? Colors.green.shade600 : Colors.red.shade600,
+                color: totalBudget - totalSpent >= 0
+                    ? colorScheme.primary
+                    : colorScheme.error,
               ),
               const SizedBox(width: 8),
               Text(
                 totalBudget - totalSpent >= 0
-                    ? 'Remaining: ${currency.format(totalBudget - totalSpent)}'
-                    : 'Over budget by: ${currency.format((totalSpent - totalBudget).abs())}',
-                style: TextStyle(
-                  fontSize: 14,
+                    ? 'Remaining: ${(totalBudget - totalSpent).toKenyaDualCurrency()}'
+                    : 'Over budget by: ${(totalSpent - totalBudget).abs().toKenyaDualCurrency()}',
+                style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: totalBudget - totalSpent >= 0 ? Colors.green.shade600 : Colors.red.shade600,
+                  color: totalBudget - totalSpent >= 0
+                      ? colorScheme.primary
+                      : colorScheme.error,
                 ),
               ),
             ],
@@ -620,7 +685,9 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
     );
   }
 
-  Widget _buildPayDayContainer(int daysLeft) {
+  Widget _buildPayDayContainer(BuildContext context, int daysLeft) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     String label;
     if (daysLeft <= 0) {
       label = 'Payday is today';
@@ -634,22 +701,24 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: colorScheme.primaryContainer.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.shade100),
+        border: Border.all(
+          color: colorScheme.primaryContainer.withValues(alpha: 0.6),
+        ),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.blue.shade100,
+              color: colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               Icons.calendar_today,
               size: 18,
-              color: Colors.blue.shade700,
+              color: colorScheme.onPrimaryContainer,
             ),
           ),
           const SizedBox(width: 12),
@@ -659,19 +728,17 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
             children: [
               Text(
                 'Next payday',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w500,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: 14,
+                style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: Colors.blue.shade700,
+                  color: colorScheme.primary,
                 ),
               ),
             ],
@@ -681,23 +748,29 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
     );
   }
 
-  List<Widget> _buildExpandedContent(List<Budget> oversTop, List<Budget> undersTop, NumberFormat currency, DateTime selectedMonth) {
+  List<Widget> _buildExpandedContent(
+    BuildContext context,
+    List<Budget> oversTop,
+    List<Budget> undersTop,
+    DateTime selectedMonth,
+  ) {
+    final theme = Theme.of(context);
     List<Widget> widgets = [];
     
     if (oversTop.isNotEmpty) {
       widgets.addAll([
         Text(
           'Overspent Categories',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
-            color: Colors.red.shade700,
+            color: theme.colorScheme.error,
           ),
         ),
         const SizedBox(height: 8),
         ...oversTop.asMap().entries.map((entry) {
           final index = entry.key;
           final budget = entry.value;
-          return _buildCategoryItem(budget, index, currency, true);
+          return _buildCategoryItem(context, budget, index, true);
         }),
         const SizedBox(height: 16),
       ]);
@@ -707,16 +780,16 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
       widgets.addAll([
         Text(
           'Underspent Categories',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
-            color: Colors.green.shade700,
+            color: theme.colorScheme.primary,
           ),
         ),
         const SizedBox(height: 8),
         ...undersTop.asMap().entries.map((entry) {
           final index = entry.key + oversTop.length;
           final budget = entry.value;
-          return _buildCategoryItem(budget, index, currency, false);
+          return _buildCategoryItem(context, budget, index, false);
         }),
         const SizedBox(height: 16),
       ]);
@@ -725,18 +798,25 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
     return widgets;
   }
 
-  Widget _buildCategoryItem(Budget budget, int index, NumberFormat currency, bool isOverspent) {
-    final color = isOverspent ? Colors.red : Colors.green;
+  Widget _buildCategoryItem(
+    BuildContext context,
+    Budget budget,
+    int index,
+    bool isOverspent,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final Color color = isOverspent ? colorScheme.error : colorScheme.primary;
     final progressPercentage = budget.amount > 0 ? (budget.spent / budget.amount * 100) : 0;
     
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.8),
+        color: colorScheme.surface.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.grey.shade200,
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
           width: 1,
         ),
       ),
@@ -745,13 +825,13 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.shade100,
+              color: color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               isOverspent ? Icons.trending_up : Icons.trending_down,
               size: 16,
-              color: color.shade600,
+              color: color,
             ),
           ),
           const SizedBox(width: 12),
@@ -762,17 +842,15 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
               children: [
                 Text(
                   budget.category,
-                  style: const TextStyle(
+                  style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
-                    fontSize: 14,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  'Budget: ${currency.format(budget.amount)}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
+                  'Budget: ${budget.amount.toKenyaDualCurrency()}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -786,20 +864,18 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
             children: [
               Text(
                 isOverspent
-                    ? '+${currency.format(budget.spent - budget.amount)}'
-                    : currency.format(budget.amount - budget.spent),
-                style: TextStyle(
-                  color: color.shade600,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                    ? '+${(budget.spent - budget.amount).toKenyaDualCurrency()}'
+                    : (budget.amount - budget.spent).toKenyaDualCurrency(),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w700,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
               Text(
                 isOverspent ? 'over budget' : 'remaining',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: color.shade500,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -811,18 +887,16 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
             children: [
               Text(
                 '${progressPercentage.toStringAsFixed(0)}%',
-                style: TextStyle(
-                  fontSize: 12,
+                style: theme.textTheme.labelSmall?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: color.shade600,
+                  color: color,
                 ),
               ),
               Text(
-                currency.format(budget.spent),
-                style: TextStyle(
-                  fontSize: 14,
+                budget.spent.toKenyaDualCurrency(),
+                style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: color.shade700,
+                  color: color,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -866,7 +940,9 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
     );
   }
 
-  Widget _buildAlertSummary(List<Budget> budgets) {
+  Widget _buildAlertSummary(BuildContext context, List<Budget> budgets) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final overBudgetCount = budgets.where((b) => b.spent > b.amount).length;
     final nearLimitCount = budgets.where((b) => b.spent > b.amount * 0.8 && b.spent <= b.amount).length;
     final onTrackCount = budgets.length - overBudgetCount - nearLimitCount;
@@ -877,19 +953,20 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Budget Alert Summary',
-            style: TextStyle(
-              fontSize: 14,
+            style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
+              color: colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
@@ -899,7 +976,7 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
               Flexible(
                 child: _buildAlertSummaryItem(
                   icon: Icons.check_circle,
-                  color: Colors.green,
+                  color: colorScheme.primary,
                   count: onTrackCount,
                   label: 'On Track',
                 ),
@@ -907,7 +984,7 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
               Flexible(
                 child: _buildAlertSummaryItem(
                   icon: Icons.warning,
-                  color: Colors.orange,
+                  color: colorScheme.tertiary,
                   count: nearLimitCount,
                   label: 'Near Limit',
                 ),
@@ -915,7 +992,7 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
               Flexible(
                 child: _buildAlertSummaryItem(
                   icon: Icons.error,
-                  color: Colors.red,
+                  color: colorScheme.error,
                   count: overBudgetCount,
                   label: 'Over Budget',
                 ),
@@ -925,20 +1002,22 @@ class _BudgetAdherenceCardState extends State<BudgetAdherenceCard>
           if (overBudgetCount > 0 || nearLimitCount > 0) ...[
             const SizedBox(height: 8),
             GestureDetector(
-              onTap: () => NavigationService.navigateTo(AppConstants.budgetsRoute),
+              onTap: () {
+                HapticFeedback.selectionClick();
+                NavigationService.navigateTo(AppConstants.budgetsRoute);
+              },
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   'Review Budget Details →',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Theme.of(context).primaryColor,
-                    fontSize: 12,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onPrimaryContainer,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
