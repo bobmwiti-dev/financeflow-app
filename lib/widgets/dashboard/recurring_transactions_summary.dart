@@ -43,7 +43,11 @@ class _RecurringTransactionsSummaryState extends State<RecurringTransactionsSumm
     
     // Determine status color based on percentage of income
     final isHealthy = percentOfIncome <= widget.recommendedPercentage;
-    final statusColor = isHealthy ? Colors.green.shade700 : Colors.red.shade700;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final Color statusColor = isHealthy
+        ? colorScheme.primary
+        : colorScheme.error;
     
     // Sort transactions by amount (highest first)
     final sortedTransactions = List<RecurringTransaction>.from(widget.transactions)
@@ -54,11 +58,29 @@ class _RecurringTransactionsSummaryState extends State<RecurringTransactionsSumm
         ? sortedTransactions.length
         : sortedTransactions.length > 3 ? 3 : sortedTransactions.length;
     
-    return Card(
+    return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 2,
-      shadowColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.surfaceContainerHighest.withValues(alpha: 0.98),
+            colorScheme.surface.withValues(alpha: 0.98),
+          ],
+        ),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -70,14 +92,39 @@ class _RecurringTransactionsSummaryState extends State<RecurringTransactionsSumm
               children: [
                 Text(
                   'Recurring Expenses',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                        color: colorScheme.onSurface,
                       ),
                 ),
                 if (widget.onViewAll != null)
                   TextButton(
-                    onPressed: widget.onViewAll,
-                    child: const Text('View All'),
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      widget.onViewAll!();
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: colorScheme.primary,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'View All',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.arrow_forward_ios,
+                          size: 12,
+                        ),
+                      ],
+                    ),
                   ),
               ],
             )
@@ -161,10 +208,13 @@ class _RecurringTransactionsSummaryState extends State<RecurringTransactionsSumm
     Color statusColor,
     bool isHealthy,
   ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: statusColor.withValues(alpha: 0.1),
+        color: statusColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -179,18 +229,20 @@ class _RecurringTransactionsSummaryState extends State<RecurringTransactionsSumm
                 children: [
                   Text(
                     'Monthly Total',
-                    style: TextStyle(
+                    style: theme.textTheme.labelSmall?.copyWith(
                       fontSize: 12,
                       color: statusColor,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    totalRecurring.toCurrency(),
-                    style: TextStyle(
+                    totalRecurring.toKenyaDualCurrency(),
+                    style: theme.textTheme.titleMedium?.copyWith(
                       fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w800,
                       color: statusColor,
+                      letterSpacing: -0.1,
                     ),
                   ),
                 ],
@@ -198,7 +250,7 @@ class _RecurringTransactionsSummaryState extends State<RecurringTransactionsSumm
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.2),
+                  color: statusColor.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(
@@ -211,9 +263,9 @@ class _RecurringTransactionsSummaryState extends State<RecurringTransactionsSumm
                     const SizedBox(width: 4),
                     Text(
                       isHealthy ? 'Healthy' : 'High',
-                      style: TextStyle(
+                      style: theme.textTheme.labelSmall?.copyWith(
                         fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w700,
                         color: statusColor,
                       ),
                     ),
@@ -240,16 +292,16 @@ class _RecurringTransactionsSummaryState extends State<RecurringTransactionsSumm
                 children: [
                   Text(
                     '${(percentOfIncome * 100).toStringAsFixed(1)}% of Income',
-                    style: TextStyle(
+                    style: theme.textTheme.bodySmall?.copyWith(
                       fontSize: 12,
                       color: statusColor,
                     ),
                   ),
                   Text(
                     'Target: ${(widget.recommendedPercentage * 100).toInt()}%',
-                    style: TextStyle(
+                    style: theme.textTheme.bodySmall?.copyWith(
                       fontSize: 12,
-                      color: statusColor,
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -262,7 +314,7 @@ class _RecurringTransactionsSummaryState extends State<RecurringTransactionsSumm
                     height: 8,
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
@@ -272,7 +324,14 @@ class _RecurringTransactionsSummaryState extends State<RecurringTransactionsSumm
                     child: Container(
                       height: 8,
                       decoration: BoxDecoration(
-                        color: statusColor,
+                        gradient: LinearGradient(
+                          colors: [
+                            statusColor,
+                            statusColor.withValues(alpha: 0.8),
+                          ],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
@@ -286,7 +345,7 @@ class _RecurringTransactionsSummaryState extends State<RecurringTransactionsSumm
                     child: Container(
                       width: 2,
                       height: 8,
-                      color: Colors.black,
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -302,6 +361,9 @@ class _RecurringTransactionsSummaryState extends State<RecurringTransactionsSumm
   }
 
   Widget _buildEmptyState() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 24),
       alignment: Alignment.center,
@@ -311,19 +373,23 @@ class _RecurringTransactionsSummaryState extends State<RecurringTransactionsSumm
           Icon(
             Icons.repeat,
             size: 48,
-            color: Colors.grey.shade300,
+            color: colorScheme.outlineVariant,
           )
           .animate()
           .scale(duration: const Duration(milliseconds: 600), curve: Curves.elasticOut),
           const SizedBox(height: 16),
           Text(
             'No recurring transactions',
-            style: Theme.of(context).textTheme.titleMedium,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: colorScheme.onSurface,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Add recurring expenses to track your subscriptions and bills',
-            style: Theme.of(context).textTheme.bodySmall,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -332,6 +398,9 @@ class _RecurringTransactionsSummaryState extends State<RecurringTransactionsSumm
   }
 
   Widget _buildTransactionItem(RecurringTransaction transaction, int index) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return EnhancedAnimations.scaleOnTap(
       onTap: () {
         HapticFeedback.selectionClick();
@@ -343,8 +412,11 @@ class _RecurringTransactionsSummaryState extends State<RecurringTransactionsSumm
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(8),
+          color: colorScheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+          ),
         ),
         child: Row(
           children: [
@@ -371,15 +443,16 @@ class _RecurringTransactionsSummaryState extends State<RecurringTransactionsSumm
                 children: [
                   Text(
                     transaction.name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurface,
                     ),
                   ),
                   Text(
                     '${transaction.frequencyDescription} • ${transaction.category}',
-                    style: TextStyle(
+                    style: theme.textTheme.bodySmall?.copyWith(
                       fontSize: 12,
-                      color: Theme.of(context).textTheme.bodySmall?.color,
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -391,18 +464,19 @@ class _RecurringTransactionsSummaryState extends State<RecurringTransactionsSumm
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  transaction.amount.toCurrency(),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
+                  transaction.amount.toKenyaDualCurrency(),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
                   ),
                 ),
                 Text(
                   transaction.nextDueDate != null
                       ? 'Next: ${DateFormat('MMM d').format(transaction.nextDueDate!)}'
                       : '',
-                  style: TextStyle(
+                  style: theme.textTheme.bodySmall?.copyWith(
                     fontSize: 12,
-                    color: Theme.of(context).textTheme.bodySmall?.color,
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
