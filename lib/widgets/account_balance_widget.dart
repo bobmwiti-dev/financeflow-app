@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 
 import '../models/account_model.dart';
 import '../viewmodels/account_viewmodel.dart';
 import '../viewmodels/transaction_viewmodel_fixed.dart' as fixed;
 import '../viewmodels/income_viewmodel.dart';
-import '../themes/app_theme.dart';
+import '../utils/currency_extensions.dart';
 
 /// Widget to display account balances with real-time updates
 class AccountBalanceWidget extends StatelessWidget {
@@ -25,14 +26,39 @@ class AccountBalanceWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Consumer3<AccountViewModel, fixed.TransactionViewModel, IncomeViewModel>(
       builder: (context, accountVm, transactionVm, incomeVm, child) {
         if (accountVm.isLoading) {
-          return const Card(
-            child: Padding(
-              padding: EdgeInsets.all(16),
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  colorScheme.surfaceContainerHighest.withValues(alpha: 0.98),
+                  colorScheme.surface.withValues(alpha: 0.98),
+                ],
+              ),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 18,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: const Padding(
+              padding: EdgeInsets.all(20),
               child: Center(
-                child: CircularProgressIndicator(),
+                child: CircularProgressIndicator.adaptive(),
               ),
             ),
           );
@@ -46,7 +72,29 @@ class AccountBalanceWidget extends StatelessWidget {
             ? accountVm.activeAccounts 
             : [accountVm.defaultAccount].where((a) => a != null).cast<Account>().toList();
 
-        return Card(
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                colorScheme.surfaceContainerHighest.withValues(alpha: 0.98),
+                colorScheme.surface.withValues(alpha: 0.98),
+              ],
+            ),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -54,22 +102,47 @@ class AccountBalanceWidget extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.account_balance_wallet,
-                      color: AppTheme.primaryColor,
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.account_balance_wallet,
+                        color: colorScheme.onPrimaryContainer,
+                      ),
                     ),
                     const SizedBox(width: 8),
-                    const Text(
-                      'Account Balances',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Account Balances',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          showAllAccounts && accounts.length > 1
+                              ? 'Across ${accounts.length} accounts'
+                              : accounts.first.currency,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
                     const Spacer(),
                     if (showAddButton)
                       IconButton(
-                        onPressed: onAddAccount ?? () => _navigateToAccountSetup(context),
+                        onPressed: () {
+                          HapticFeedback.selectionClick();
+                          (onAddAccount ?? () => _navigateToAccountSetup(context))();
+                        },
                         icon: const Icon(Icons.add),
                         tooltip: 'Add Account',
                       ),
@@ -83,30 +156,42 @@ class AccountBalanceWidget extends StatelessWidget {
                   margin: const EdgeInsets.symmetric(horizontal: 16),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withValues(alpha:0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    gradient: LinearGradient(
+                      colors: [
+                        colorScheme.primary.withValues(alpha: 0.12),
+                        colorScheme.primaryContainer.withValues(alpha: 0.06),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: colorScheme.primary.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      const Text(
+                      Text(
                         'Total Balance',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
                           fontSize: 16,
+                          color: colorScheme.onPrimaryContainer,
                         ),
                       ),
                       const Spacer(),
                       Text(
-                        _formatCurrency(
-                          accountVm.getTotalBalance(
-                            transactionVm.transactions,
-                            incomeVm.incomeSources,
-                          ),
-                        ),
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
+                        accountVm
+                            .getTotalBalance(
+                              transactionVm.transactions,
+                              incomeVm.incomeSources,
+                            )
+                            .toKenyaDualCurrency(),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
                           fontSize: 18,
-                          color: AppTheme.primaryColor,
+                          color: colorScheme.onPrimaryContainer,
+                          letterSpacing: -0.2,
                         ),
                       ),
                     ],
@@ -134,7 +219,32 @@ class AccountBalanceWidget extends StatelessWidget {
   }
 
   Widget _buildNoAccountsCard(BuildContext context) {
-    return Card(
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.surfaceContainerHighest.withValues(alpha: 0.98),
+            colorScheme.surface.withValues(alpha: 0.98),
+          ],
+        ),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -142,35 +252,44 @@ class AccountBalanceWidget extends StatelessWidget {
             Icon(
               Icons.account_balance_wallet_outlined,
               size: 64,
-              color: Colors.grey.shade400,
+              color: colorScheme.outlineVariant,
             ),
             const SizedBox(height: 16),
             Text(
               'No Accounts Set Up',
-              style: TextStyle(
+              style: theme.textTheme.titleMedium?.copyWith(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey.shade600,
+                color: colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Add your first account to start tracking real balances',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.grey.shade500,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              onPressed: onAddAccount ?? () => _navigateToAccountSetup(context),
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                (onAddAccount ?? () => _navigateToAccountSetup(context))();
+              },
               icon: const Icon(Icons.add),
               label: const Text('Add Account'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
+              ),
             ),
           ],
         ),
       ),
-    );
+    ).animate()
+      .fadeIn(duration: 600.ms)
+      .slideY(begin: 0.2, duration: 600.ms, curve: Curves.easeOutCubic);
   }
 
   Widget _buildAccountTile(
@@ -180,6 +299,9 @@ class AccountBalanceWidget extends StatelessWidget {
     fixed.TransactionViewModel transactionVm,
     IncomeViewModel incomeVm,
   ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     final balance = accountVm.getAccountBalance(
       account.id,
       transactionVm.transactions,
@@ -202,7 +324,10 @@ class AccountBalanceWidget extends StatelessWidget {
       ),
       title: Text(
         account.name,
-        style: const TextStyle(fontWeight: FontWeight.w500),
+        style: theme.textTheme.bodyMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+          color: colorScheme.onSurface,
+        ),
       ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -210,7 +335,7 @@ class AccountBalanceWidget extends StatelessWidget {
           Text(
             account.type.displayName,
             style: TextStyle(
-              color: Colors.grey.shade600,
+              color: colorScheme.onSurfaceVariant,
               fontSize: 12,
             ),
           ),
@@ -223,17 +348,17 @@ class AccountBalanceWidget extends StatelessWidget {
                       : Icons.trending_down,
                   size: 14,
                   color: performance.isPositiveGrowth 
-                      ? Colors.green 
-                      : Colors.red,
+                      ? colorScheme.primary 
+                      : colorScheme.error,
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '${performance.isPositiveGrowth ? '+' : ''}${_formatCurrency(performance.monthlyChange)}',
+                  '${performance.isPositiveGrowth ? '+' : ''}${performance.monthlyChange.abs().toKenyaDualCurrency()}',
                   style: TextStyle(
                     fontSize: 12,
                     color: performance.isPositiveGrowth 
-                        ? Colors.green 
-                        : Colors.red,
+                        ? colorScheme.primary 
+                        : colorScheme.error,
                   ),
                 ),
               ],
@@ -245,23 +370,28 @@ class AccountBalanceWidget extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(
-            _formatCurrency(balance),
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
+            balance.toKenyaDualCurrency(),
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
               fontSize: 16,
-              color: balance >= 0 ? Colors.green : Colors.red,
+              color: balance >= 0 ? colorScheme.primary : colorScheme.error,
             ),
           ),
           Text(
             account.currency,
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey.shade500,
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
         ],
       ),
-      onTap: onAccountTap != null ? () => onAccountTap!(account) : null,
+      onTap: onAccountTap != null
+          ? () {
+              HapticFeedback.selectionClick();
+              onAccountTap!(account);
+            }
+          : null,
     );
   }
 
@@ -293,14 +423,6 @@ class AccountBalanceWidget extends StatelessWidget {
       case AccountType.investment:
         return Icons.trending_up;
     }
-  }
-
-  String _formatCurrency(double amount) {
-    final formatter = NumberFormat.currency(
-      symbol: 'KES ',
-      decimalDigits: 0,
-    );
-    return formatter.format(amount);
   }
 
   void _navigateToAccountSetup(BuildContext context) {
