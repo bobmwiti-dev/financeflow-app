@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../../../viewmodels/emergency_fund_viewmodel.dart';
 import '../../../viewmodels/income_viewmodel.dart';
 import '../../../models/emergency_fund_model.dart';
+import '../../../utils/currency_extensions.dart';
 
 /// Enhanced Emergency Fund Card with improved CRUD operations and visual polish
 class EnhancedEmergencyFundCard extends StatefulWidget {
@@ -51,6 +53,8 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
         final emergencyFund = emergencyFundVM.emergencyFund;
         final monthlyIncome = incomeVM.getTotalIncome();
         final estimatedExpenses = monthlyIncome * 0.7;
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
         
         return MouseRegion(
           onEnter: (_) {
@@ -67,13 +71,23 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
             duration: const Duration(milliseconds: 300),
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.white,
               borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  colorScheme.surfaceContainerHighest.withValues(alpha: 0.98),
+                  colorScheme.surface.withValues(alpha: 0.98),
+                ],
+              ),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: _isHovered ? 0.12 : 0.08),
-                  blurRadius: _isHovered ? 25 : 20,
-                  offset: Offset(0, _isHovered ? 12 : 8),
+                  color: Colors.black.withValues(alpha: _isHovered ? 0.16 : 0.08),
+                  blurRadius: _isHovered ? 24 : 18,
+                  offset: Offset(0, _isHovered ? 14 : 10),
                 ),
               ],
             ),
@@ -89,6 +103,9 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
   }
 
   Widget _buildSetupCard(BuildContext context, EmergencyFundViewModel viewModel, double estimatedExpenses) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -99,12 +116,12 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF9800).withValues(alpha: 0.1),
+                  color: colorScheme.tertiaryContainer,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
                   Icons.security_outlined,
-                  color: Color(0xFFFF9800),
+                  color: Colors.white,
                   size: 24,
                 ),
               ),
@@ -140,15 +157,15 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFFFF9800).withValues(alpha: 0.1),
-                  const Color(0xFFFFC107).withValues(alpha: 0.05),
+                  colorScheme.tertiary.withValues(alpha: 0.12),
+                  colorScheme.tertiaryContainer.withValues(alpha: 0.06),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: const Color(0xFFFF9800).withValues(alpha: 0.2),
+                color: colorScheme.tertiary.withValues(alpha: 0.25),
                 width: 1,
               ),
             ),
@@ -171,9 +188,9 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
                 const SizedBox(height: 8),
                 Text(
                   'Protect yourself from unexpected expenses with 3-6 months of living costs',
-                  style: TextStyle(
+                  style: theme.textTheme.bodySmall?.copyWith(
                     fontSize: 14,
-                    color: Colors.grey[600],
+                    color: colorScheme.onSurfaceVariant,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -185,7 +202,7 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
                         context,
                         'Quick Setup',
                         'Based on your income',
-                        '\$${(estimatedExpenses * 3).toStringAsFixed(0)}',
+                        estimatedExpenses * 3,
                         () => _createEmergencyFund(context, viewModel, estimatedExpenses, 3),
                       ),
                     ),
@@ -195,7 +212,7 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
                         context,
                         'Recommended',
                         '6 months coverage',
-                        '\$${(estimatedExpenses * 6).toStringAsFixed(0)}',
+                        estimatedExpenses * 6,
                         () => _createEmergencyFund(context, viewModel, estimatedExpenses, 6),
                       ),
                     ),
@@ -207,8 +224,8 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
                   icon: const Icon(Icons.tune),
                   label: const Text('Custom Setup'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFFF9800),
-                    side: const BorderSide(color: Color(0xFFFF9800)),
+                    foregroundColor: colorScheme.tertiary,
+                    side: BorderSide(color: colorScheme.tertiary),
                   ),
                 ),
               ],
@@ -219,16 +236,19 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
     );
   }
 
-  Widget _buildSetupOption(BuildContext context, String title, String subtitle, String amount, VoidCallback onTap) {
+  Widget _buildSetupOption(BuildContext context, String title, String subtitle, double amount, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: const Color(0xFFFF9800).withValues(alpha: 0.3),
+            color: colorScheme.tertiary.withValues(alpha: 0.3),
             width: 1,
           ),
         ),
@@ -236,28 +256,28 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
           children: [
             Text(
               title,
-              style: const TextStyle(
+              style: theme.textTheme.bodyMedium?.copyWith(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1A1A1A),
+                color: colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               subtitle,
-              style: TextStyle(
+              style: theme.textTheme.bodySmall?.copyWith(
                 fontSize: 12,
-                color: Colors.grey[600],
+                color: colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              amount,
-              style: const TextStyle(
+              amount.toKenyaDualCurrency(),
+              style: theme.textTheme.labelLarge?.copyWith(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFFFF9800),
+                color: colorScheme.tertiary,
               ),
             ),
           ],
@@ -291,39 +311,42 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
   }
 
   Widget _buildFundHeader(BuildContext context, EmergencyFundViewModel viewModel, EmergencyFund fund) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Row(
       children: [
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFF4CAF50).withValues(alpha: 0.1),
+            color: colorScheme.primaryContainer,
             borderRadius: BorderRadius.circular(12),
           ),
           child: const Icon(
             Icons.security,
-            color: Color(0xFF4CAF50),
+            color: Colors.white,
             size: 24,
           ),
         ),
         const SizedBox(width: 16),
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Emergency Fund',
-                style: TextStyle(
+                style: theme.textTheme.titleMedium?.copyWith(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A1A1A),
+                  color: colorScheme.onSurface,
                 ),
               ),
               SizedBox(height: 4),
               Text(
                 'Financial security buffer',
-                style: TextStyle(
+                style: theme.textTheme.bodySmall?.copyWith(
                   fontSize: 14,
-                  color: Colors.grey,
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -333,15 +356,19 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
           onSelected: (value) {
             switch (value) {
               case 'add':
+                HapticFeedback.selectionClick();
                 _showTransactionDialog(context, viewModel, true);
                 break;
               case 'withdraw':
+                HapticFeedback.selectionClick();
                 _showTransactionDialog(context, viewModel, false);
                 break;
               case 'edit':
+                HapticFeedback.selectionClick();
                 _showEditTargetDialog(context, viewModel, fund);
                 break;
               case 'delete':
+                HapticFeedback.selectionClick();
                 _showDeleteConfirmation(context, viewModel);
                 break;
             }
@@ -391,7 +418,7 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
           child: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
@@ -406,6 +433,9 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
   }
 
   Widget _buildAmountDisplay(EmergencyFund fund, Color progressColor) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -414,15 +444,15 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
           children: [
             Text(
               'Current Amount',
-              style: TextStyle(
+              style: theme.textTheme.bodySmall?.copyWith(
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 4),
             Text(
-              '\$${fund.currentAmount.toStringAsFixed(0)}',
-              style: TextStyle(
+              fund.currentAmount.toKenyaDualCurrency(),
+              style: theme.textTheme.headlineSmall?.copyWith(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
                 color: progressColor,
@@ -435,26 +465,26 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
           children: [
             Text(
               'Target Amount',
-              style: TextStyle(
+              style: theme.textTheme.bodySmall?.copyWith(
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 4),
             Text(
-              '\$${fund.targetAmount.toStringAsFixed(0)}',
-              style: const TextStyle(
+              fund.targetAmount.toKenyaDualCurrency(),
+              style: theme.textTheme.titleMedium?.copyWith(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF1A1A1A),
+                color: colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               '${fund.targetMonths} months',
-              style: TextStyle(
+              style: theme.textTheme.bodySmall?.copyWith(
                 fontSize: 12,
-                color: Colors.grey[500],
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -536,19 +566,21 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
   }
 
   Widget _buildStatusSection(EmergencyFund fund, bool isComplete) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final remaining = fund.remainingAmount;
     
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
+        color: colorScheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
           Icon(
             isComplete ? Icons.check_circle : Icons.info_outline,
-            color: isComplete ? const Color(0xFF4CAF50) : const Color(0xFFFF9800),
+            color: isComplete ? colorScheme.primary : colorScheme.tertiary,
             size: 20,
           ),
           const SizedBox(width: 12),
@@ -559,11 +591,11 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
                 Text(
                   isComplete 
                     ? 'Fully Funded!' 
-                    : '\$${remaining.toStringAsFixed(0)} remaining',
-                  style: TextStyle(
+                    : '${remaining.toKenyaDualCurrency()} remaining',
+                  style: theme.textTheme.bodyMedium?.copyWith(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: isComplete ? const Color(0xFF4CAF50) : const Color(0xFF1A1A1A),
+                    color: isComplete ? colorScheme.primary : colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -571,9 +603,9 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
                   isComplete
                     ? 'Your emergency fund provides excellent financial security'
                     : 'Keep building to reach your ${fund.targetMonths}-month target',
-                  style: TextStyle(
+                  style: theme.textTheme.bodySmall?.copyWith(
                     fontSize: 12,
-                    color: Colors.grey[600],
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -585,16 +617,22 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
   }
 
   Widget _buildActionButtons(BuildContext context, EmergencyFundViewModel viewModel, EmergencyFund fund) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Row(
       children: [
         Expanded(
           child: ElevatedButton.icon(
-            onPressed: () => _showTransactionDialog(context, viewModel, true),
+            onPressed: () {
+              HapticFeedback.selectionClick();
+              _showTransactionDialog(context, viewModel, true);
+            },
             icon: const Icon(Icons.add, size: 18),
             label: const Text('Add Funds'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4CAF50),
-              foregroundColor: Colors.white,
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
               padding: const EdgeInsets.symmetric(vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -606,13 +644,16 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
         Expanded(
           child: OutlinedButton.icon(
             onPressed: fund.currentAmount > 0 
-              ? () => _showTransactionDialog(context, viewModel, false)
+              ? () {
+                  HapticFeedback.selectionClick();
+                  _showTransactionDialog(context, viewModel, false);
+                }
               : null,
             icon: const Icon(Icons.remove, size: 18),
             label: const Text('Withdraw'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFFFF5722),
-              side: const BorderSide(color: Color(0xFFFF5722)),
+              foregroundColor: colorScheme.error,
+              side: BorderSide(color: colorScheme.error),
               padding: const EdgeInsets.symmetric(vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -666,7 +707,7 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
               controller: targetController,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                labelText: 'Target Amount (\$)',
+                labelText: 'Target Amount',
                 border: const OutlineInputBorder(),
                 prefixIcon: const Icon(Icons.attach_money),
                 hintText: (estimatedExpenses * 6).toStringAsFixed(0),
@@ -740,7 +781,7 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
               controller: amountController,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                labelText: 'Amount (\$)',
+                labelText: 'Amount',
                 border: const OutlineInputBorder(),
                 prefixIcon: const Icon(Icons.attach_money),
                 hintText: isAdding ? 'Enter amount to add' : 'Enter amount to withdraw',
@@ -791,7 +832,7 @@ class _EnhancedEmergencyFundCardState extends State<EnhancedEmergencyFundCard>
                   SnackBar(
                     content: Text(
                       success
-                        ? '${isAdding ? 'Added' : 'Withdrew'} \$${amount.toStringAsFixed(0)} ${isAdding ? 'to' : 'from'} emergency fund'
+                        ? '${isAdding ? 'Added' : 'Withdrew'} ${amount.toKenyaDualCurrency()} ${isAdding ? 'to' : 'from'} emergency fund'
                         : 'Transaction failed. Please try again.',
                     ),
                     backgroundColor: success ? const Color(0xFF4CAF50) : const Color(0xFFFF5722),
