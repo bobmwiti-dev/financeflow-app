@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -6,7 +7,10 @@ import 'package:provider/provider.dart';
 import '../../../viewmodels/transaction_viewmodel_fixed.dart';
 import '../../../viewmodels/income_viewmodel.dart';
 import '../../../viewmodels/bill_viewmodel.dart';
+import '../../../viewmodels/account_viewmodel.dart';
 import '../../../models/transaction_model.dart';
+import '../../../services/balance_service.dart';
+import '../../../utils/currency_extensions.dart';
 
 /// Data model for cash flow points
 class CashFlowPoint {
@@ -83,13 +87,15 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
 
     if (transactionVm == null || incomeVm == null || billVm == null) return;
 
+    final accountVm = Provider.of<AccountViewModel>(context, listen: false);
+
     setState(() => _isLoading = true);
     
     try {
       // Use the current in-memory data from the viewmodels. These are kept
       // up to date via their own Firestore listeners, so we don't need to
       // trigger additional queries here.
-      _generateHistoricalData(transactionVm, incomeVm);
+      _generateHistoricalData(transactionVm, incomeVm, accountVm);
       _generateForecastData(transactionVm, incomeVm, billVm);
       
     } catch (e) {
@@ -121,7 +127,13 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     super.dispose();
   }
 
-  void _generateHistoricalData(TransactionViewModel transactionVm, IncomeViewModel incomeVm) {
+  String _formatAmount(double amount) => amount.toKenyaDualCurrency();
+
+  void _generateHistoricalData(
+    TransactionViewModel transactionVm,
+    IncomeViewModel incomeVm,
+    AccountViewModel accountVm,
+  ) {
     final now = DateTime.now();
     final historicalPoints = <CashFlowPoint>[];
     
@@ -138,7 +150,10 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     if (allDates.isEmpty) {
       debugPrint('Cash Flow Debug: No historical data available');
       _historicalData = [];
-      _currentBalance = 0;
+      _currentBalance = accountVm.getTotalBalance(
+        transactionVm.transactions,
+        incomeVm.incomeSources,
+      );
       return;
     }
     
@@ -150,38 +165,46 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     
     // Use available months (minimum 1, maximum 6)
     final monthsToProcess = (monthsAvailable == 0) ? 1 : monthsAvailable;
-    double runningBalance = 0;
-    
+
+    final currentBalance = accountVm.getTotalBalance(
+      transactionVm.transactions,
+      incomeVm.incomeSources,
+    );
+
     for (int i = monthsToProcess - 1; i >= 0; i--) {
-      final month = DateTime(now.year, now.month - i, 1);
-      final nextMonth = DateTime(now.year, now.month - i + 1, 1);
-      
-      final monthlyIncome = incomeVm.incomeSources
-          .where((income) => 
-              income.date.isAfter(month.subtract(const Duration(days: 1))) &&
-              income.date.isBefore(nextMonth))
-          .fold<double>(0, (sum, income) => sum + income.amount);
-      
-      final monthlyExpenses = transactionVm.transactions
-          .where((transaction) => 
-              transaction.type == TransactionType.expense &&
-              transaction.date.isAfter(month.subtract(const Duration(days: 1))) &&
-              transaction.date.isBefore(nextMonth))
-          .fold<double>(0, (sum, transaction) => sum + transaction.amount.abs());
-      
-      runningBalance += monthlyIncome - monthlyExpenses;
-      
-      debugPrint('Cash Flow Debug: Month ${month.month}/${month.year} - Income: \$$monthlyIncome, Expenses: \$$monthlyExpenses, Balance: \$$runningBalance');
-      
-      historicalPoints.add(CashFlowPoint(
-        date: month,
-        amount: runningBalance,
-        isActual: true,
-      ));
+      final monthStart = DateTime(now.year, now.month - i, 1);
+      final isCurrentMonth = monthStart.year == now.year && monthStart.month == now.month;
+
+      final amount = isCurrentMonth
+          ? currentBalance
+          : accountVm.activeAccounts.fold<double>(0.0, (sum, account) {
+              final endOfMonth = DateTime(
+                monthStart.year,
+                monthStart.month + 1,
+                0,
+                23,
+                59,
+                59,
+              );
+              return sum + BalanceService.calculateAccountBalanceUpToDate(
+                account,
+                transactionVm.transactions,
+                incomeVm.incomeSources,
+                endOfMonth,
+              );
+            });
+
+      historicalPoints.add(
+        CashFlowPoint(
+          date: monthStart,
+          amount: amount,
+          isActual: true,
+        ),
+      );
     }
-    
+
     _historicalData = historicalPoints;
-    _currentBalance = historicalPoints.isNotEmpty ? historicalPoints.last.amount : 0;
+    _currentBalance = currentBalance;
   }
 
   void _generateForecastData(TransactionViewModel transactionVm, IncomeViewModel incomeVm, BillViewModel billVm) {
@@ -203,9 +226,12 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
       final monthIndex = (forecastMonth.month - 1) % 12;
       
       // Use seasonal patterns if available, otherwise use averages
-      double projectedIncome = monthlyIncomePattern.isNotEmpty 
-          ? monthlyIncomePattern[monthIndex] + recurringIncome
-          : _calculateAverageIncome(incomeVm);
+      double projectedIncome;
+      if (monthlyIncomePattern.isNotEmpty) {
+        projectedIncome = monthlyIncomePattern[monthIndex] + recurringIncome;
+      } else {
+        projectedIncome = _calculateAverageNonRecurringIncome(incomeVm) + recurringIncome;
+      }
       
       double projectedExpenses = monthlyExpensePattern.isNotEmpty
           ? monthlyExpensePattern[monthIndex]
@@ -271,6 +297,34 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     return avgIncome;
   }
 
+  double _calculateAverageNonRecurringIncome(IncomeViewModel incomeVm) {
+    final incomeByMonth = <DateTime, double>{};
+
+    for (final income in incomeVm.incomeSources) {
+      if (income.isRecurring == true) continue;
+      final monthKey = DateTime(income.date.year, income.date.month, 1);
+      incomeByMonth[monthKey] = (incomeByMonth[monthKey] ?? 0) + income.amount;
+    }
+
+    if (incomeByMonth.isEmpty) {
+      return 0;
+    }
+
+    final now = DateTime.now();
+    final sortedMonths = incomeByMonth.keys.toList()..sort();
+    double weightedSum = 0;
+    double totalWeight = 0;
+
+    for (final month in sortedMonths) {
+      final monthsAgo = ((now.year - month.year) * 12 + now.month - month.month);
+      final weight = 1.0 / (1.0 + monthsAgo * 0.1);
+      weightedSum += incomeByMonth[month]! * weight;
+      totalWeight += weight;
+    }
+
+    return totalWeight > 0 ? weightedSum / totalWeight : 0;
+  }
+
   double _calculateAverageExpenses(TransactionViewModel transactionVm) {
     // Find available expense data by month
     final expensesByMonth = <DateTime, double>{};
@@ -328,6 +382,7 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     final monthlyCount = List<int>.filled(12, 0);
     
     for (final income in incomeVm.incomeSources) {
+      if (income.isRecurring == true) continue;
       final monthIndex = income.date.month - 1;
       monthlyPattern[monthIndex] += income.amount;
       monthlyCount[monthIndex]++;
@@ -461,43 +516,40 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     double upcomingBills = 0.0;
     
     for (final bill in billVm.bills) {
-      // Check if bill is due in the forecast month
-      if (bill.dueDate.year == forecastMonth.year && bill.dueDate.month == forecastMonth.month) {
-        upcomingBills += bill.amount;
-      }
-      
-      // Handle recurring bills using the frequency field
-      if (bill.frequency != null && bill.frequency!.isNotEmpty) {
-        final frequency = bill.frequency!.toLowerCase();
-        
-        if (frequency.contains('monthly')) {
-          // Monthly recurring bill - add to every forecast month
+      final frequency = (bill.frequency ?? '').toLowerCase();
+      final isRecurring = bill.isRecurring == true && frequency.isNotEmpty;
+
+      if (!isRecurring) {
+        if (bill.dueDate.year == forecastMonth.year && bill.dueDate.month == forecastMonth.month) {
           upcomingBills += bill.amount;
-        } else if (frequency.contains('weekly')) {
-          // Weekly recurring bill - multiply by ~4.33 weeks per month
-          upcomingBills += bill.amount * 4.33;
-        } else if (frequency.contains('quarterly')) {
-          // Quarterly bill - check if forecast month aligns with quarterly cycle
-          final monthsSinceBill = ((forecastMonth.year - bill.dueDate.year) * 12 + 
-                                  forecastMonth.month - bill.dueDate.month);
-          if (monthsSinceBill >= 0 && monthsSinceBill % 3 == 0) {
-            upcomingBills += bill.amount;
-          }
-        } else if (frequency.contains('yearly') || frequency.contains('annual')) {
-          // Yearly bill - check if forecast month matches the bill's due month
-          if (forecastMonth.month == bill.dueDate.month) {
-            upcomingBills += bill.amount;
-          }
-        } else if (frequency.contains('biweekly') || frequency.contains('bi-weekly')) {
-          // Biweekly recurring bill - multiply by ~2.17 periods per month
-          upcomingBills += bill.amount * 2.17;
-        } else if (frequency.contains('bimonthly') || frequency.contains('bi-monthly')) {
-          // Bimonthly (every 2 months) - check if forecast month aligns
-          final monthsSinceBill = ((forecastMonth.year - bill.dueDate.year) * 12 + 
-                                  forecastMonth.month - bill.dueDate.month);
-          if (monthsSinceBill >= 0 && monthsSinceBill % 2 == 0) {
-            upcomingBills += bill.amount;
-          }
+        }
+        continue;
+      }
+
+      final monthsSinceBill = ((forecastMonth.year - bill.dueDate.year) * 12 +
+              forecastMonth.month - bill.dueDate.month);
+
+      if (monthsSinceBill < 0) {
+        continue;
+      }
+
+      if (frequency.contains('monthly')) {
+        upcomingBills += bill.amount;
+      } else if (frequency.contains('biweekly') || frequency.contains('bi-weekly')) {
+        upcomingBills += bill.amount * 2.17;
+      } else if (frequency.contains('weekly')) {
+        upcomingBills += bill.amount * 4.33;
+      } else if (frequency.contains('bimonthly') || frequency.contains('bi-monthly')) {
+        if (monthsSinceBill % 2 == 0) {
+          upcomingBills += bill.amount;
+        }
+      } else if (frequency.contains('quarterly')) {
+        if (monthsSinceBill % 3 == 0) {
+          upcomingBills += bill.amount;
+        }
+      } else if (frequency.contains('yearly') || frequency.contains('annual')) {
+        if (forecastMonth.month == bill.dueDate.month) {
+          upcomingBills += bill.amount;
         }
       }
     }
@@ -508,52 +560,105 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(context),
-            const SizedBox(height: 16),
-            if (_isLoading)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(32.0),
-                  child: CircularProgressIndicator(),
-                ),
-              )
-            else if (_historicalData.isEmpty && _forecastData.isEmpty)
-              _buildEmptyState()
-            else ...[
-              _buildSummaryCards(),
-              const SizedBox(height: 16),
-              _buildChart(context),
-              const SizedBox(height: 16),
-              _buildInsights(),
-            ],
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.surfaceContainerHighest.withValues(alpha: 0.98),
+            colorScheme.surface.withValues(alpha: 0.98),
           ],
+        ),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Material(
+          color: Colors.transparent,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(context),
+                const SizedBox(height: 16),
+                if (_isLoading)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: CircularProgressIndicator(
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  )
+                else if (_historicalData.isEmpty && _forecastData.isEmpty)
+                  _buildEmptyState(context)
+                else ...[
+                  _buildSummaryCards(context),
+                  const SizedBox(height: 14),
+                  _buildChart(context),
+                  const SizedBox(height: 14),
+                  _buildInsights(context),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildHeader(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final dataMonths = _historicalData.length;
+    final String confidenceLabel = dataMonths >= 6
+        ? 'High confidence'
+        : dataMonths >= 3
+            ? 'Medium confidence'
+            : 'Low confidence';
+    final Color confidenceBg = dataMonths >= 6
+        ? colorScheme.secondaryContainer
+        : dataMonths >= 3
+            ? colorScheme.tertiaryContainer
+            : colorScheme.surfaceContainerHighest;
+    final Color confidenceFg = dataMonths >= 6
+        ? colorScheme.onSecondaryContainer
+        : dataMonths >= 3
+            ? colorScheme.onTertiaryContainer
+            : colorScheme.onSurfaceVariant;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.blue.shade100,
-            borderRadius: BorderRadius.circular(8),
+            color: colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: colorScheme.primary.withValues(alpha: 0.18),
+            ),
           ),
           child: Icon(
             Icons.trending_up,
-            color: Colors.blue.shade700,
-            size: 18,
+            color: colorScheme.onPrimaryContainer,
+            size: 20,
           ),
         ),
         const SizedBox(width: 10),
@@ -568,46 +673,93 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
                   Flexible(
                     child: Text(
                       'Cash Flow Forecast',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: _historicalData.length >= 3 
-                          ? Colors.green.withValues(alpha: 0.2)
-                          : Colors.orange.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '${_historicalData.length}M',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: _historicalData.length >= 3 
-                            ? Colors.green[700]
-                            : Colors.orange[700],
-                        fontWeight: FontWeight.w500,
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: confidenceBg,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          confidenceLabel,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: confidenceFg,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                    ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Text(
+                          '${widget.monthsToForecast}mo',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
               if (widget.onViewDetails != null) ...[
                 const SizedBox(height: 8),
-                TextButton(
-                  onPressed: widget.onViewDetails,
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(0, 30),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: InkWell(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      widget.onViewDetails?.call();
+                    },
+                    borderRadius: BorderRadius.circular(999),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: colorScheme.primary.withValues(alpha: 0.16),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.open_in_new_rounded,
+                            size: 16,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'View details',
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  child: const Text('View Details', style: TextStyle(fontSize: 13)),
-                ),
+                )
               ],
             ],
           ),
@@ -616,31 +768,49 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     );
   }
 
-  Widget _buildSummaryCards() {
-    final currency = NumberFormat.currency(symbol: '\$ ', decimalDigits: 0);
+  Widget _buildSummaryCards(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     final balanceChange = _projectedBalance - _currentBalance;
     final isPositive = balanceChange >= 0;
-    
+
     return Row(
       children: [
         Expanded(
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(16),
+              color: colorScheme.surfaceContainerHigh,
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.30),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Current Balance',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                  'Current balance',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  currency.format(_currentBalance),
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                const SizedBox(height: 6),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeIn,
+                  child: Text(
+                    _formatAmount(_currentBalance),
+                    key: ValueKey(_currentBalance),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.2,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -651,25 +821,67 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: isPositive ? Colors.green.shade50 : Colors.red.shade50,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  (isPositive ? colorScheme.primary : colorScheme.error)
+                      .withValues(alpha: 0.10),
+                  colorScheme.surfaceContainerHigh,
+                ],
+              ),
+              border: Border.all(
+                color: (isPositive ? colorScheme.primary : colorScheme.error)
+                    .withValues(alpha: 0.18),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Projected (${widget.monthsToForecast}mo)',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  currency.format(_projectedBalance),
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold, 
-                    fontSize: 16,
-                    color: isPositive ? Colors.green.shade700 : Colors.red.shade700,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
+                const SizedBox(height: 6),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeIn,
+                  child: Text(
+                    _formatAmount(_projectedBalance),
+                    key: ValueKey(_projectedBalance),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.2,
+                      color: isPositive ? colorScheme.primary : colorScheme.error,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      isPositive ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                      size: 16,
+                      color: isPositive ? colorScheme.primary : colorScheme.error,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${isPositive ? '+' : '-'}${_formatAmount(balanceChange.abs())}',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                )
               ],
             ),
           ),
@@ -679,6 +891,9 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
   }
 
   Widget _buildChart(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     final allData = [..._historicalData, ..._forecastData];
     if (allData.isEmpty) return const SizedBox.shrink();
 
@@ -695,23 +910,96 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _buildLegendItem(Colors.blue, 'Historical', false),
+            _buildLegendItem(colorScheme.primary, 'Historical', false),
             const SizedBox(width: 16),
-            _buildLegendItem(Colors.orange, 'Forecast', true),
+            _buildLegendItem(colorScheme.tertiary, 'Forecast', true),
           ],
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 220,
+        Container(
+          height: 240,
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+            ),
+          ),
           child: LineChart(
             LineChartData(
+              lineTouchData: LineTouchData(
+                enabled: true,
+                handleBuiltInTouches: true,
+                getTouchedSpotIndicator: (barData, spotIndexes) {
+                  return spotIndexes
+                      .map(
+                        (index) => TouchedSpotIndicatorData(
+                          FlLine(
+                            color: colorScheme.outlineVariant.withValues(alpha: 0.65),
+                            strokeWidth: 1,
+                          ),
+                          FlDotData(
+                            show: true,
+                            getDotPainter: (spot, percent, bar, idx) {
+                              return FlDotCirclePainter(
+                                radius: 4,
+                                color: bar.gradient?.colors.last ?? colorScheme.primary,
+                                strokeWidth: 2,
+                                strokeColor: colorScheme.surface,
+                              );
+                            },
+                          ),
+                        ),
+                      )
+                      .toList();
+                },
+                touchTooltipData: LineTouchTooltipData(
+                  tooltipRoundedRadius: 12,
+                  tooltipPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  fitInsideHorizontally: true,
+                  fitInsideVertically: true,
+                  getTooltipColor: (spot) => colorScheme.surface,
+                  getTooltipItems: (spots) {
+                    return spots.map((spot) {
+                      final idx = spot.x.toInt().clamp(0, allData.length - 1);
+                      final point = allData[idx];
+                      final month = DateFormat('MMM yyyy').format(point.date);
+                      final isForecast = !point.isActual;
+
+                      return LineTooltipItem(
+                        '$month\n${_formatAmount(point.amount)}',
+                        theme.textTheme.labelMedium!.copyWith(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: isForecast ? '\nForecast' : '\nActual',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList();
+                  },
+                ),
+              ),
               gridData: FlGridData(
                 show: true,
                 drawVerticalLine: true,
                 horizontalInterval: safeHorizontalInterval,
                 verticalInterval: 1,
-                getDrawingHorizontalLine: (value) => FlLine(color: Colors.grey.shade300, strokeWidth: 1),
-                getDrawingVerticalLine: (value) => FlLine(color: Colors.grey.shade300, strokeWidth: 1),
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                  strokeWidth: 1,
+                ),
+                getDrawingVerticalLine: (value) => FlLine(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                  strokeWidth: 1,
+                ),
               ),
               titlesData: FlTitlesData(
                 show: true,
@@ -729,7 +1017,10 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
                           axisSide: meta.axisSide,
                           child: Text(
                             DateFormat('MMM').format(allData[index].date),
-                            style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500, fontSize: 11),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         );
                       }
@@ -744,14 +1035,22 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
                     getTitlesWidget: (value, meta) {
                       return Text(
                         NumberFormat.compact().format(value),
-                        style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500, fontSize: 11),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
                       );
                     },
                     reservedSize: 42,
                   ),
                 ),
               ),
-              borderData: FlBorderData(show: true, border: Border.all(color: Colors.grey.shade300)),
+              borderData: FlBorderData(
+                show: true,
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                ),
+              ),
               minX: 0,
               maxX: (allData.length - 1).toDouble(),
               minY: minY - padding,
@@ -763,19 +1062,32 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
                       return FlSpot(entry.key.toDouble(), entry.value.amount);
                     }).toList(),
                     isCurved: true,
-                    gradient: LinearGradient(colors: [Colors.blue.shade400, Colors.blue.shade600]),
+                    gradient: LinearGradient(
+                      colors: [
+                        colorScheme.primary.withValues(alpha: 0.80),
+                        colorScheme.primary,
+                      ],
+                    ),
                     barWidth: 3,
                     isStrokeCapRound: true,
                     dotData: FlDotData(
                       show: true,
                       getDotPainter: (spot, percent, barData, index) {
-                        return FlDotCirclePainter(radius: 3, color: Colors.blue.shade600, strokeWidth: 2, strokeColor: Colors.white);
+                        return FlDotCirclePainter(
+                          radius: 3,
+                          color: colorScheme.primary,
+                          strokeWidth: 2,
+                          strokeColor: colorScheme.surface,
+                        );
                       },
                     ),
                     belowBarData: BarAreaData(
                       show: true,
                       gradient: LinearGradient(
-                        colors: [Colors.blue.shade400.withValues(alpha: 0.3), Colors.blue.shade600.withValues(alpha: 0.1)],
+                        colors: [
+                          colorScheme.primary.withValues(alpha: 0.20),
+                          colorScheme.primary.withValues(alpha: 0.04),
+                        ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                       ),
@@ -788,20 +1100,33 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
                       return FlSpot(xIndex.toDouble(), entry.value.amount);
                     }).toList(),
                     isCurved: true,
-                    gradient: LinearGradient(colors: [Colors.orange.shade400, Colors.orange.shade600]),
+                    gradient: LinearGradient(
+                      colors: [
+                        colorScheme.tertiary.withValues(alpha: 0.80),
+                        colorScheme.tertiary,
+                      ],
+                    ),
                     barWidth: 3,
                     isStrokeCapRound: true,
                     dashArray: [8, 4],
                     dotData: FlDotData(
                       show: true,
                       getDotPainter: (spot, percent, barData, index) {
-                        return FlDotCirclePainter(radius: 3, color: Colors.orange.shade600, strokeWidth: 2, strokeColor: Colors.white);
+                        return FlDotCirclePainter(
+                          radius: 3,
+                          color: colorScheme.tertiary,
+                          strokeWidth: 2,
+                          strokeColor: colorScheme.surface,
+                        );
                       },
                     ),
                     belowBarData: BarAreaData(
                       show: true,
                       gradient: LinearGradient(
-                        colors: [Colors.orange.shade400.withValues(alpha: 0.2), Colors.orange.shade600.withValues(alpha: 0.1)],
+                        colors: [
+                          colorScheme.tertiary.withValues(alpha: 0.16),
+                          colorScheme.tertiary.withValues(alpha: 0.04),
+                        ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                       ),
@@ -816,6 +1141,9 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
   }
 
   Widget _buildLegendItem(Color color, String label, bool isDashed) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -825,13 +1153,21 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
           decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
         ),
         const SizedBox(width: 6),
-        Text(label, style: TextStyle(color: Colors.grey.shade600, fontSize: 12, fontWeight: FontWeight.w500)),
+        Text(
+          label,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildInsights() {
-    final currency = NumberFormat.currency(symbol: '\$ ', decimalDigits: 0);
+  Widget _buildInsights(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     final balanceChange = _projectedBalance - _currentBalance;
     final isPositive = balanceChange >= 0;
     final monthlyChange = balanceChange / widget.monthsToForecast;
@@ -839,13 +1175,20 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     // Calculate confidence level based on data availability
     final dataMonths = _historicalData.length;
     final confidenceLevel = dataMonths >= 6 ? 'High' : dataMonths >= 3 ? 'Medium' : 'Low';
-    final confidenceColor = dataMonths >= 6 ? Colors.green : dataMonths >= 3 ? Colors.orange : Colors.red;
+    final confidenceColor = dataMonths >= 6
+        ? colorScheme.secondary
+        : dataMonths >= 3
+            ? colorScheme.tertiary
+            : colorScheme.error;
     
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -853,19 +1196,25 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Forecast Insights', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
+              Text(
+                'Forecast insights',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: colorScheme.onSurface,
+                ),
+              ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: confidenceColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
                   '$confidenceLevel Confidence',
                   style: TextStyle(
                     fontSize: 10,
-                    color: confidenceColor.shade700,
-                    fontWeight: FontWeight.w500,
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -878,16 +1227,19 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
             children: [
               Icon(
                 isPositive ? Icons.trending_up : Icons.trending_down,
-                color: isPositive ? Colors.green : Colors.red,
+                color: isPositive ? colorScheme.primary : colorScheme.error,
                 size: 16,
               ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   isPositive 
-                    ? 'Projected to gain ${currency.format(balanceChange.abs())} (${currency.format(monthlyChange.abs())}/month)'
-                    : 'Projected to lose ${currency.format(balanceChange.abs())} (${currency.format(monthlyChange.abs())}/month)',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                    ? 'Projected to gain ${_formatAmount(balanceChange.abs())} (${_formatAmount(monthlyChange.abs())}/month)'
+                    : 'Projected to lose ${_formatAmount(balanceChange.abs())} (${_formatAmount(monthlyChange.abs())}/month)',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -899,12 +1251,15 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
           if (!isPositive) ...[
             Row(
               children: [
-                Icon(Icons.warning_amber_outlined, color: Colors.orange, size: 16),
+                Icon(Icons.warning_amber_outlined, color: colorScheme.tertiary, size: 16),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     'Consider reducing expenses or finding additional income sources',
-                    style: TextStyle(fontSize: 11, color: Colors.orange.shade700),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -917,7 +1272,7 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
               children: [
                 Icon(
                   isPositive ? Icons.savings_outlined : Icons.account_balance_wallet_outlined,
-                  color: isPositive ? Colors.blue : Colors.red,
+                  color: isPositive ? colorScheme.primary : colorScheme.error,
                   size: 16,
                 ),
                 const SizedBox(width: 6),
@@ -926,7 +1281,10 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
                     isPositive 
                         ? 'Strong cash flow - consider investing surplus funds'
                         : 'Significant cash outflow - review major expenses',
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -938,12 +1296,15 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
           if (dataMonths < 3) ...[
             Row(
               children: [
-                Icon(Icons.info_outline, color: Colors.blue, size: 16),
+                Icon(Icons.info_outline, color: colorScheme.primary, size: 16),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     'Add more transaction history for improved forecast accuracy',
-                    style: TextStyle(fontSize: 11, color: Colors.blue.shade600),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -954,22 +1315,45 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
-            Icon(Icons.show_chart, size: 64, color: Colors.grey.shade400),
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: colorScheme.primary.withValues(alpha: 0.16),
+                ),
+              ),
+              child: Icon(
+                Icons.show_chart_rounded,
+                size: 30,
+                color: colorScheme.primary,
+              ),
+            ),
             const SizedBox(height: 16),
             Text(
               'No cash flow data available',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 16, fontWeight: FontWeight.w500),
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               'Add some transactions and income to see your cash flow forecast',
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
           ],
