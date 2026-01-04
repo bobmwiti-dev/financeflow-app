@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 
 import '../../services/transaction_service.dart';
+import '../../utils/currency_extensions.dart';
 
 class SideHustleReportScreen extends StatefulWidget {
   final int? initialYear;
@@ -31,8 +32,6 @@ class _SideHustleReportScreenState extends State<SideHustleReportScreen> {
       body: FutureBuilder<Map<int, Map<String, double>>>(
         future: TransactionService.instance.getBusinessMonthlySummary(_year),
         builder: (context, snapshot) {
-          final currency = NumberFormat.currency(symbol: 'KES ', decimalDigits: 0);
-
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -75,7 +74,7 @@ class _SideHustleReportScreenState extends State<SideHustleReportScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                _buildYtdSummary(currency, totalIncome, totalExpenses, totalNet),
+                _buildYtdSummary(context, totalIncome, totalExpenses, totalNet),
                 const SizedBox(height: 12),
                 Align(
                   alignment: Alignment.centerLeft,
@@ -104,7 +103,7 @@ class _SideHustleReportScreenState extends State<SideHustleReportScreen> {
                 const SizedBox(height: 12),
                 SizedBox(
                   height: 260,
-                  child: _buildNetBarChart(monthly),
+                  child: _buildNetBarChart(context, monthly),
                 ),
                 const SizedBox(height: 12),
                 const Text(
@@ -143,58 +142,203 @@ class _SideHustleReportScreenState extends State<SideHustleReportScreen> {
   }
 
   Widget _buildYtdSummary(
-    NumberFormat currency,
+    BuildContext context,
     double income,
     double expenses,
     double net,
   ) {
-    final netColor = net >= 0 ? Colors.green.shade700 : Colors.red.shade700;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final hasActivity = income > 0 || expenses > 0;
+    final netIsPositive = net >= 0;
+    final netColor = netIsPositive ? colorScheme.primary : colorScheme.error;
 
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    final statusLabel = !hasActivity
+        ? 'No activity yet'
+        : net == 0
+            ? 'Break-even YTD'
+            : netIsPositive
+                ? 'Profitable YTD'
+                : 'Running at a loss';
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.surface,
+            colorScheme.surfaceContainerHighest.withValues(alpha: 0.9),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.18),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Year-to-date summary',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: _metric('Revenue', currency.format(income), Colors.green.shade700)),
-                Expanded(child: _metric('Expenses', currency.format(expenses), Colors.red.shade700)),
-              ],
-            ),
-            const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Net Profit', style: TextStyle(fontWeight: FontWeight.w600)),
-                Text(currency.format(net), style: TextStyle(fontWeight: FontWeight.bold, color: netColor)),
+                Text(
+                  'Year-to-date summary',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: !hasActivity
+                        ? colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.9)
+                        : netIsPositive
+                            ? colorScheme.primaryContainer
+                                .withValues(alpha: 0.9)
+                            : colorScheme.errorContainer
+                                .withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        !hasActivity
+                            ? Icons.hourglass_empty
+                            : netIsPositive
+                                ? Icons.trending_up
+                                : Icons.trending_down,
+                        size: 14,
+                        color: !hasActivity
+                            ? colorScheme.onSurfaceVariant
+                            : netIsPositive
+                                ? colorScheme.onPrimaryContainer
+                                : colorScheme.onErrorContainer,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        statusLabel,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: !hasActivity
+                              ? colorScheme.onSurfaceVariant
+                              : netIsPositive
+                                  ? colorScheme.onPrimaryContainer
+                                  : colorScheme.onErrorContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
+            const SizedBox(height: 12),
+            if (!hasActivity)
+              Text(
+                'No side-hustle income or expenses recorded for $_year yet.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              )
+            else ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: _metric(
+                      context,
+                      'Revenue',
+                      income,
+                      colorScheme.primary,
+                    ),
+                  ),
+                  Expanded(
+                    child: _metric(
+                      context,
+                      'Expenses',
+                      expenses,
+                      colorScheme.error,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Net Profit',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  Text(
+                    net.toKenyaDualCurrency(),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: netColor,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _metric(String label, String value, Color color) {
+  Widget _metric(
+    BuildContext context,
+    String label,
+    double amount,
+    Color color,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
         const SizedBox(height: 4),
-        Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+        Text(
+          amount.toKenyaDualCurrency(),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildNetBarChart(Map<int, Map<String, double>> monthly) {
+  Widget _buildNetBarChart(
+    BuildContext context,
+    Map<int, Map<String, double>> monthly,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     final bars = <BarChartGroupData>[];
 
     double minY = 0;
@@ -220,7 +364,7 @@ class _SideHustleReportScreenState extends State<SideHustleReportScreen> {
               toY: net,
               width: 10,
               borderRadius: BorderRadius.circular(6),
-              color: net >= 0 ? Colors.green.shade600 : Colors.red.shade600,
+              color: net >= 0 ? colorScheme.primary : colorScheme.error,
             ),
           ],
         ),
@@ -239,7 +383,19 @@ class _SideHustleReportScreenState extends State<SideHustleReportScreen> {
       BarChartData(
         minY: minY - padding,
         maxY: maxY + padding,
-        gridData: FlGridData(show: true, drawVerticalLine: false),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          getDrawingHorizontalLine: (value) {
+            final isZeroLine = value == 0;
+            return FlLine(
+              color: isZeroLine
+                  ? colorScheme.outlineVariant.withValues(alpha: 0.7)
+                  : colorScheme.outlineVariant.withValues(alpha: 0.35),
+              strokeWidth: isZeroLine ? 1.2 : 0.6,
+            );
+          },
+        ),
         borderData: FlBorderData(show: false),
         barGroups: bars,
         titlesData: FlTitlesData(
@@ -250,7 +406,12 @@ class _SideHustleReportScreenState extends State<SideHustleReportScreen> {
               showTitles: true,
               reservedSize: 42,
               getTitlesWidget: (value, meta) {
-                return Text(NumberFormat.compact().format(value));
+                return Text(
+                  NumberFormat.compact().format(value),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                );
               },
             ),
           ),
@@ -265,7 +426,10 @@ class _SideHustleReportScreenState extends State<SideHustleReportScreen> {
                   axisSide: meta.axisSide,
                   child: Text(
                     DateFormat('MMM').format(DateTime(_year, month, 1)),
-                    style: const TextStyle(fontSize: 10),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontSize: 10,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 );
               },
