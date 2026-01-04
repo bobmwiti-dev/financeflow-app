@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:logging/logging.dart';
@@ -10,6 +11,7 @@ import '../../../utils/kenya_merchant_recognition.dart';
 import '../../../services/merchant_rule_service.dart';
 import '../../../constants/app_constants.dart';
 import '../../../viewmodels/transaction_viewmodel_fixed.dart' as fixed;
+import '../../../utils/currency_extensions.dart';
 
 /// Recent Transactions card displaying user's transaction history
 class RecentTransactionsCard extends StatefulWidget {
@@ -149,37 +151,54 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
   Widget build(BuildContext context) {
     return Consumer<fixed.TransactionViewModel>(
       builder: (context, transactionVM, child) {
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
         final transactions = _getFilteredTransactions(transactionVM.transactions);
-        
+
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              colors: [
+                colorScheme.surface,
+                colorScheme.surfaceContainerHighest.withValues(alpha: 0.9),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+              width: 1,
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                color: colorScheme.shadow.withValues(alpha: 0.25),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              _buildFilterChips(),
-              _buildTransactionsList(transactions),
-            ],
+          child: Material(
+            color: Colors.transparent,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(theme, colorScheme),
+                _buildFilterChips(theme, colorScheme),
+                _buildTransactionsList(context, theme, colorScheme, transactions),
+              ],
+            ),
           ),
-        ).animate()
-          .fadeIn(duration: 600.ms)
-          .slideY(begin: 0.3, duration: 600.ms, curve: Curves.easeOutCubic);
+        )
+            .animate()
+            .fadeIn(duration: 600.ms)
+            .slideY(begin: 0.3, duration: 600.ms, curve: Curves.easeOutCubic);
       },
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(ThemeData theme, ColorScheme colorScheme) {
     final selectedMonth = widget.selectedMonth ?? DateTime.now();
     final monthName = DateFormat.MMMM().format(selectedMonth);
     
@@ -191,12 +210,11 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Recent Transactions',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.onSurface,
                 ),
               ),
               Row(
@@ -204,14 +222,13 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
                   Icon(
                     Icons.calendar_month,
                     size: 14,
-                    color: Colors.grey[600],
+                    color: colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     '$monthName ${selectedMonth.year}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -222,12 +239,12 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.blue.withValues(alpha: 0.1),
+              color: colorScheme.primaryContainer.withValues(alpha: 0.9),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               Icons.receipt_long,
-              color: Colors.blue[600],
+              color: colorScheme.onPrimaryContainer,
               size: 20,
             ),
           ),
@@ -236,7 +253,7 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
     );
   }
 
-  Widget _buildFilterChips() {
+  Widget _buildFilterChips(ThemeData theme, ColorScheme colorScheme) {
     return Container(
       height: 50,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -254,18 +271,20 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
               selected: isSelected,
               onSelected: (selected) {
                 if (selected) {
+                  HapticFeedback.selectionClick();
                   setState(() {
                     _selectedFilter = filter;
                   });
                 }
               },
-              backgroundColor: Colors.grey[100],
-              selectedColor: Colors.blue.withValues(alpha: 0.2),
-              checkmarkColor: Colors.blue[700],
-              labelStyle: TextStyle(
-                color: isSelected ? Colors.blue[700] : Colors.grey[700],
+              backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+              selectedColor: colorScheme.primaryContainer.withValues(alpha: 0.9),
+              checkmarkColor: colorScheme.onPrimaryContainer,
+              labelStyle: theme.textTheme.labelSmall?.copyWith(
+                color: isSelected
+                    ? colorScheme.onPrimaryContainer
+                    : colorScheme.onSurfaceVariant,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                fontSize: 12,
               ),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
@@ -275,9 +294,14 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
     );
   }
 
-  Widget _buildTransactionsList(List<Transaction> transactions) {
+  Widget _buildTransactionsList(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+    List<Transaction> transactions,
+  ) {
     if (transactions.isEmpty) {
-      return _buildEmptyState();
+      return _buildEmptyState(context, theme, colorScheme);
     }
 
     return Column(
@@ -288,24 +312,37 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
           itemCount: transactions.length,
           itemBuilder: (context, index) {
             final transaction = transactions[index];
-            return _buildSmartTransactionTile(transaction, index);
+            return _buildSmartTransactionTile(context, theme, colorScheme,
+                transaction, index);
           },
         ),
         if (widget.onViewAll != null)
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextButton(
-              onPressed: widget.onViewAll,
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                widget.onViewAll?.call();
+              },
               style: TextButton.styleFrom(
-                foregroundColor: Colors.blue[700],
+                foregroundColor: colorScheme.primary,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('View All Transactions'),
-                  SizedBox(width: 4),
-                  Icon(Icons.arrow_forward_ios, size: 14),
+                  Text(
+                    'View All Transactions',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 14,
+                    color: colorScheme.primary,
+                  ),
                 ],
               ),
             ),
@@ -314,8 +351,13 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
     );
   }
 
-  Widget _buildSmartTransactionTile(Transaction transaction, int index) {
-    final currencyFormat = NumberFormat.currency(symbol: 'KES ', decimalDigits: 2);
+  Widget _buildSmartTransactionTile(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+    Transaction transaction,
+    int index,
+  ) {
     final isExpense = transaction.isExpense;
     final isHovered = _hoveredIndex == index;
     
@@ -346,15 +388,19 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
         duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         decoration: BoxDecoration(
-          color: isHovered ? Colors.blue.withValues(alpha: 0.05) : Colors.grey[50],
+          color: isHovered
+              ? colorScheme.primaryContainer.withValues(alpha: 0.15)
+              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isHovered ? Colors.blue.withValues(alpha: 0.3) : Colors.grey[200]!,
+            color: isHovered
+                ? colorScheme.primary.withValues(alpha: 0.5)
+                : colorScheme.outlineVariant.withValues(alpha: 0.5),
             width: isHovered ? 1.5 : 1,
           ),
           boxShadow: isHovered ? [
             BoxShadow(
-              color: Colors.blue.withValues(alpha: 0.1),
+              color: colorScheme.primary.withValues(alpha: 0.20),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -365,6 +411,7 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
             onTap: () {
+              HapticFeedback.selectionClick();
               _logger.info('Smart transaction tapped: ${transaction.title}');
               Navigator.pushNamed(
                 context,
@@ -387,10 +434,12 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
                       children: [
                         Text(
                           displayName,
-                          style: TextStyle(
+                          style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                             fontSize: isHovered ? 16 : 15,
-                            color: isHovered ? Colors.blue[700] : Colors.black87,
+                            color: isHovered
+                                ? colorScheme.primary
+                                : colorScheme.onSurface,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -401,12 +450,13 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: categoryColor.withValues(alpha: isHovered ? 0.2 : 0.1),
+                                color: categoryColor
+                                    .withValues(alpha: isHovered ? 0.2 : 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
                                 smartCategory,
-                                style: TextStyle(
+                                style: theme.textTheme.labelSmall?.copyWith(
                                   fontSize: 11,
                                   color: categoryColor,
                                   fontWeight: FontWeight.w600,
@@ -417,14 +467,14 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
                             Icon(
                               Icons.access_time,
                               size: 12,
-                              color: Colors.grey[500],
+                              color: colorScheme.onSurfaceVariant,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               DateFormat.MMMd().format(transaction.date),
-                              style: TextStyle(
+                              style: theme.textTheme.labelSmall?.copyWith(
                                 fontSize: 11,
-                                color: Colors.grey[600],
+                                color: colorScheme.onSurfaceVariant,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -437,15 +487,15 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
                               Icon(
                                 Icons.lightbulb_outline,
                                 size: 12,
-                                color: Colors.blue[600],
+                                color: colorScheme.secondary,
                               ),
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
                                   insights,
-                                  style: TextStyle(
+                                  style: theme.textTheme.labelSmall?.copyWith(
                                     fontSize: 10,
-                                    color: Colors.blue[600],
+                                    color: colorScheme.secondary,
                                     fontStyle: FontStyle.italic,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -487,10 +537,15 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
                     child: Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: Colors.grey.withValues(alpha: 0.08),
+                        color: colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.8),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.more_vert, size: 18),
+                      child: Icon(
+                        Icons.more_vert,
+                        size: 18,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -500,20 +555,26 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
                     children: [
                       AnimatedDefaultTextStyle(
                         duration: const Duration(milliseconds: 200),
-                        style: TextStyle(
+                        style: (theme.textTheme.bodyMedium ?? const TextStyle()).copyWith(
                           fontWeight: FontWeight.bold,
                           fontSize: isHovered ? 16 : 15,
-                          color: isExpense ? Colors.red[600] : Colors.green[600],
+                          color: isExpense
+                              ? colorScheme.error
+                              : colorScheme.primary,
                         ),
-                        child: Text(currencyFormat.format(transaction.amount.abs())),
+                        child: Text(
+                          transaction.amount.abs().toKenyaDualCurrency(),
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: isExpense 
-                            ? Colors.red.withValues(alpha: isHovered ? 0.2 : 0.1) 
-                            : Colors.green.withValues(alpha: isHovered ? 0.2 : 0.1),
+                          color: isExpense
+                              ? colorScheme.error
+                                  .withValues(alpha: isHovered ? 0.2 : 0.1)
+                              : colorScheme.primary
+                                  .withValues(alpha: isHovered ? 0.2 : 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
@@ -549,7 +610,11 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
       .slideX(begin: 0.3, duration: 400.ms);
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
     return Container(
       padding: const EdgeInsets.all(32),
       child: Column(
@@ -558,43 +623,43 @@ class _RecentTransactionsCardState extends State<RecentTransactionsCard>
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color:
+                  colorScheme.surfaceContainerHighest.withValues(alpha: 0.9),
               borderRadius: BorderRadius.circular(40),
             ),
             child: Icon(
               Icons.receipt_long_outlined,
               size: 40,
-              color: Colors.grey[400],
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 16),
           Text(
             'No transactions yet',
-            style: TextStyle(
-              fontSize: 16,
+            style: theme.textTheme.bodyLarge?.copyWith(
               fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
+              color: colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Start tracking your expenses and income',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
           ElevatedButton.icon(
             onPressed: () {
+              HapticFeedback.selectionClick();
               Navigator.pushNamed(context, '/add_transaction');
             },
             icon: const Icon(Icons.add),
             label: const Text('Add Transaction'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue[600],
-              foregroundColor: Colors.white,
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
