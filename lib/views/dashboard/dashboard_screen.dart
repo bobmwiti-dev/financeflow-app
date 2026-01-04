@@ -74,6 +74,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   double _balance = 0.0;
   Map<String, double> _categoryTotals = {};
   int _selectedMonthIndex = DateTime.now().month - 1;
+  int _selectedYear = DateTime.now().year;
+  
+  DateTime get _selectedMonthDate =>
+      DateTime(_selectedYear, _selectedMonthIndex + 1);
   
   // Previous month data for trends
   double _previousExpenses = 0.0;
@@ -205,8 +209,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (vm == null) return;
 
     // Filter transactions for the currently selected month index
-    final now = DateTime.now();
-    final currentMonth = DateTime(now.year, _selectedMonthIndex + 1);
+    final currentMonth = _selectedMonthDate;
     final monthTransactions = vm.transactions.where((t) =>
       t.date.year == currentMonth.year && t.date.month == currentMonth.month,
     ).toList();
@@ -273,8 +276,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       // Load previous month data for trends in the background
       () async {
-        final now = DateTime.now();
-        final currentMonth = DateTime(now.year, _selectedMonthIndex + 1);
+        final currentMonth = _selectedMonthDate;
         logger.info('Background load of historical data for ${DateFormat.yMMMM().format(currentMonth)}');
         await _loadPreviousMonthData(currentMonth);
       }();
@@ -400,8 +402,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
 
     // Add income sources from IncomeViewModel so dashboard stays in sync
-    final now = DateTime.now();
-    final currentMonth = DateTime(now.year, _selectedMonthIndex + 1);
+    final currentMonth = _selectedMonthDate;
     final incomeVM = Provider.of<IncomeViewModel>(context, listen: false);
     incomeVM.setSelectedMonth(currentMonth);
     final double incomeSourcesTotal = incomeVM.getTotalIncome();
@@ -645,13 +646,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
             // Insight of the Day should be the first card after greeting
             InsightOfTheDayCard(
-              selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1),
+              selectedMonth: _selectedMonthDate,
             ),
             const SizedBox(height: 8),
 
             // This month at a glance
             EnhancedMonthlySummary(
-              selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1),
+              selectedMonth: _selectedMonthDate,
             ).animate().fadeIn(delay: 50.ms, duration: 400.ms),
             const SizedBox(height: 16),
 
@@ -668,7 +669,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   previousExpenses: _previousExpenses > 0 ? _previousExpenses : null,
                   transactionHistory: _transactionHistory,
                   incomeHistory: _incomeHistory,
-                  selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1),
+                  selectedMonth: _selectedMonthDate,
                 ).animate().fadeIn(delay: 75.ms, duration: 400.ms);
               },
             ),
@@ -680,7 +681,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
             // Safe-to-spend + cash flow forecast
             EnhancedSafeToSpendCard(
-              selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1),
+              selectedMonth: _selectedMonthDate,
             ).animate().fadeIn(delay: 125.ms, duration: 400.ms),
             const SizedBox(height: 16),
             EnhancedCashFlowForecastCard(
@@ -710,7 +711,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
             // Side-hustle (Business) Summary
             SideHustleSummaryCard(
-              selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1),
+              selectedMonth: _selectedMonthDate,
             ).animate().fadeIn(delay: 175.ms, duration: 400.ms),
             const SizedBox(height: 16),
 
@@ -724,7 +725,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             const MpesaImportCard().animate().fadeIn(delay: 225.ms, duration: 400.ms),
             const SizedBox(height: 16),
             // Recent Transactions
-            RecentTransactionsCard(selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1)),
+            RecentTransactionsCard(selectedMonth: _selectedMonthDate),
             const SizedBox(height: 16),
             
             // Quick action buttons
@@ -775,7 +776,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             const SizedBox(height: 24),
             
             // Spending by category
-            BudgetAdherenceCard(selectedMonth: DateTime(DateTime.now().year, _selectedMonthIndex + 1)).animate().fadeIn(delay: 610.ms, duration: 500.ms),
+            BudgetAdherenceCard(selectedMonth: _selectedMonthDate).animate().fadeIn(delay: 610.ms, duration: 500.ms),
             const SizedBox(height: 24),
             const SizedBox(height: 70), // Space for FAB
           ],
@@ -785,56 +786,112 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           .fadeIn(duration: 500.ms, curve: Curves.easeInOut),
     );
   }
-
+  
   Widget _buildMonthSelector() {
-    return SizedBox(
-      height: 40,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: _months.length,
-        itemBuilder: (context, index) {
-          final isSelected = index == _selectedMonthIndex;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: ChoiceChip(
-              label: Text(_months[index]),
-              selected: isSelected,
-              onSelected: (selected) {
-                if (selected) {
-                  logger.info('Month selector changed to: ${_months[index]}');
-                  setState(() {
-                    _selectedMonthIndex = index;
-                  });
-                  // Reload previous-month data for trends
-                  final now = DateTime.now();
-                  final currentMonth = DateTime(now.year, index + 1);
-                  _loadPreviousMonthData(currentMonth);
-                  // Recompute dashboard metrics for the newly selected month
-                  _onTransactionsUpdated();
-                }
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Row(
+      children: [
+        Expanded(
+          child: SizedBox(
+            height: 40,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _months.length,
+              itemBuilder: (context, index) {
+                final isSelected = index == _selectedMonthIndex;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: ChoiceChip(
+                    label: Text(_months[index]),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      if (selected) {
+                        logger.info('Month selector changed to: ${_months[index]} for year $_selectedYear');
+                        setState(() {
+                          _selectedMonthIndex = index;
+                        });
+                        final currentMonth = _selectedMonthDate;
+                        _loadPreviousMonthData(currentMonth);
+                        _onTransactionsUpdated();
+                      }
+                    },
+                    backgroundColor:
+                        Colors.grey.withValues(alpha: 0.1 * 255),
+                    selectedColor: AppTheme.primaryColor
+                        .withValues(alpha: 0.2 * 255),
+                    labelStyle: TextStyle(
+                      color: isSelected
+                          ? AppTheme.primaryColor
+                          : Colors.black,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                  ),
+                );
               },
-              backgroundColor: Colors.grey.withValues(alpha: 0.1 * 255),
-              selectedColor: AppTheme.primaryColor.withValues(alpha: 0.2 * 255),
-              labelStyle: TextStyle(
-                color: isSelected ? AppTheme.primaryColor : Colors.black,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
             ),
-          );
-        },
-      ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        _buildYearSelector(theme, colorScheme),
+      ],
     ).animate().fadeIn(delay: 50.ms, duration: 400.ms);
   }
 
-  // Removed _buildBottomNavigationBar method as it's no longer used
-  /*
-  Widget _buildBottomNavigationBar(BuildContext context) {
-    // ... (original content of _buildBottomNavigationBar)
+  void _changeYear(int delta) {
+    setState(() {
+      _selectedYear += delta;
+    });
+    final currentMonth = _selectedMonthDate;
+    _loadPreviousMonthData(currentMonth);
+    _onTransactionsUpdated();
   }
-  */
 
-
-
+  Widget _buildYearSelector(ThemeData theme, ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.9),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.7),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: () => _changeYear(-1),
+            child: Icon(
+              Icons.chevron_left,
+              size: 18,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '$_selectedYear',
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: () => _changeYear(1),
+            child: Icon(
+              Icons.chevron_right,
+              size: 18,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildUserGreeting() {
     final user = _auth.currentUser;
@@ -857,7 +914,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
     // Dynamic subtitle
     final dayOfWeek = DateFormat('EEEE').format(now);
-    final thisMonthLabel = 'This month: ${_months[_selectedMonthIndex]}';
+    final thisMonthLabel =
+        'This month: ${_months[_selectedMonthIndex]} $_selectedYear';
     String subtitle = "Here's your financial overview for today.";
     final totalIncome = _incomeViewModel.getTotalIncome();
     if (_expenses > 0 && totalIncome > 0) {
