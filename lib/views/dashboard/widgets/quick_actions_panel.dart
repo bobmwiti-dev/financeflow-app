@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 class QuickActionsPanel extends StatefulWidget {
@@ -34,6 +35,9 @@ class _QuickActionsPanelState extends State<QuickActionsPanel> with SingleTicker
   
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     final List<Map<String, dynamic>> quickActions = [
       {
         'icon': Icons.shopping_cart_outlined,
@@ -82,35 +86,33 @@ class _QuickActionsPanelState extends State<QuickActionsPanel> with SingleTicker
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Colors.white, Color(0xFFFDFDFD)],
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.surface,
+            colorScheme.surfaceContainerHighest.withValues(alpha: 0.9),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: Colors.grey.withValues(alpha: 0.06),
+          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-            spreadRadius: 0,
+            color: colorScheme.shadow.withValues(alpha: 0.25),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
+      child: Material(
+        color: Colors.transparent,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
@@ -172,7 +174,7 @@ class _QuickActionsPanelState extends State<QuickActionsPanel> with SingleTicker
                         'Fast access to common tasks',
                         style: TextStyle(
                           fontSize: 15,
-                          color: Colors.grey[600],
+                          color: colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -186,38 +188,39 @@ class _QuickActionsPanelState extends State<QuickActionsPanel> with SingleTicker
             margin: const EdgeInsets.symmetric(horizontal: 20),
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: Colors.grey.withValues(alpha: 0.05),
+              color:
+                  colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.grey.withValues(alpha: 0.08)),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.8),
+              ),
             ),
             child: TabBar(
               controller: _tabController,
               dividerColor: Colors.transparent,
               indicator: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                gradient: LinearGradient(
+                  colors: [colorScheme.primary, colorScheme.secondary],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                    color: colorScheme.primary.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
                 ],
               ),
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.grey[600],
-              labelStyle: const TextStyle(
+              labelColor: colorScheme.onPrimary,
+              unselectedLabelColor: colorScheme.onSurfaceVariant,
+              labelStyle: theme.textTheme.labelMedium?.copyWith(
                 fontWeight: FontWeight.w700,
-                fontSize: 14,
                 letterSpacing: 0.2,
               ),
-              unselectedLabelStyle: const TextStyle(
+              unselectedLabelStyle: theme.textTheme.labelMedium?.copyWith(
                 fontWeight: FontWeight.w500,
-                fontSize: 14,
               ),
               indicatorSize: TabBarIndicatorSize.tab,
               tabs: const [
@@ -246,95 +249,104 @@ class _QuickActionsPanelState extends State<QuickActionsPanel> with SingleTicker
                     itemCount: quickActions.length,
                     itemBuilder: (context, index) {
                       final action = quickActions[index];
-                      return GestureDetector(
-                        onTap: () => widget.onActionSelected(action['action']),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.white,
-                                const Color(0xFFFAFAFA).withValues(alpha: 0.8),
+                      return Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(18),
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            widget.onActionSelected(action['action']);
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  colorScheme.surface,
+                                  colorScheme.surfaceContainerHighest
+                                      .withValues(alpha: 0.85),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: colorScheme.outlineVariant
+                                    .withValues(alpha: 0.6),
+                                width: 1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: colorScheme.shadow
+                                      .withValues(alpha: 0.18),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
                               ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
                             ),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: Colors.grey.withValues(alpha: 0.08),
-                              width: 1,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.03),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                                spreadRadius: 0,
-                              ),
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.01),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1),
-                                spreadRadius: 0,
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      action['color'].withValues(alpha: 0.15),
-                                      action['color'].withValues(alpha: 0.08),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        (action['color'] as Color)
+                                            .withValues(alpha: 0.18),
+                                        (action['color'] as Color)
+                                            .withValues(alpha: 0.10),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: (action['color'] as Color)
+                                            .withValues(alpha: 0.18),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
                                     ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
                                   ),
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: action['color'].withValues(alpha: 0.1),
-                                      blurRadius: 6,
-                                      offset: const Offset(0, 2),
+                                  child: Icon(
+                                    action['icon'],
+                                    color: action['color'],
+                                    size: 20,
+                                  ),
+                                ).animate().scale(
+                                      begin: const Offset(0.8, 0.8),
+                                      end: const Offset(1, 1),
+                                      delay:
+                                          Duration(milliseconds: index * 80),
+                                      duration:
+                                          const Duration(milliseconds: 400),
+                                      curve: Curves.easeOutBack,
                                     ),
-                                  ],
-                                ),
-                                child: Icon(
-                                  action['icon'],
-                                  color: action['color'],
-                                  size: 20,
-                                ),
-                              ).animate()
-                                .scale(
-                                  begin: const Offset(0.8, 0.8),
-                                  end: const Offset(1, 1),
-                                  delay: Duration(milliseconds: index * 80),
-                                  duration: const Duration(milliseconds: 400),
-                                  curve: Curves.easeOutBack,
-                                ),
-                              const SizedBox(height: 6),
-                              Flexible(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                                  child: Text(
-                                    action['label'],
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF1A1A1A),
-                                      letterSpacing: -0.1,
-                                      height: 1.2,
+                                const SizedBox(height: 6),
+                                Flexible(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 2),
+                                    child: Text(
+                                      action['label'],
+                                      style:
+                                          theme.textTheme.labelSmall?.copyWith(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: colorScheme.onSurface,
+                                        letterSpacing: -0.1,
+                                        height: 1.2,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    textAlign: TextAlign.center,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       );
@@ -351,30 +363,29 @@ class _QuickActionsPanelState extends State<QuickActionsPanel> with SingleTicker
                             Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: Colors.grey.withValues(alpha: 0.05),
+                                color: colorScheme.surfaceContainerHighest
+                                    .withValues(alpha: 0.9),
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Icon(
                                 Icons.people_outline_rounded,
                                 size: 48,
-                                color: Colors.grey[400],
+                                color: colorScheme.onSurfaceVariant,
                               ),
                             ),
                             const SizedBox(height: 16),
                             Text(
                               'No recent payees',
-                              style: TextStyle(
-                                fontSize: 16,
+                              style: theme.textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: Colors.grey[600],
+                                color: colorScheme.onSurface,
                               ),
                             ),
                             const SizedBox(height: 8),
                             Text(
                               'Your recent transaction partners will appear here',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -399,20 +410,23 @@ class _QuickActionsPanelState extends State<QuickActionsPanel> with SingleTicker
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
-                                    Colors.white,
-                                    const Color(0xFFFAFAFA).withValues(alpha: 0.8),
+                                    colorScheme.surface,
+                                    colorScheme.surfaceContainerHighest
+                                        .withValues(alpha: 0.9),
                                   ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: Colors.grey.withValues(alpha: 0.08),
+                                  color: colorScheme.outlineVariant
+                                      .withValues(alpha: 0.6),
                                   width: 1,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.02),
+                                    color: colorScheme.shadow
+                                        .withValues(alpha: 0.16),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -451,38 +465,40 @@ class _QuickActionsPanelState extends State<QuickActionsPanel> with SingleTicker
                                 ),
                                 title: Text(
                                   payee,
-                                  style: const TextStyle(
+                                  style: theme.textTheme.bodyMedium?.copyWith(
                                     fontWeight: FontWeight.w600,
                                     fontSize: 16,
-                                    color: Color(0xFF1A1A1A),
+                                    color: colorScheme.onSurface,
                                     letterSpacing: -0.2,
                                   ),
                                 ),
                                 subtitle: Text(
                                   'Tap to create transaction',
-                                  style: TextStyle(
+                                  style: theme.textTheme.bodySmall?.copyWith(
                                     fontSize: 13,
-                                    color: Colors.grey[600],
+                                    color: colorScheme.onSurfaceVariant,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
                                 trailing: Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: Colors.grey.withValues(alpha: 0.05),
+                                    color: colorScheme.surfaceContainerHighest
+                                        .withValues(alpha: 0.7),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Icon(
                                     Icons.arrow_forward_ios_rounded,
                                     size: 14,
-                                    color: Colors.grey[600],
+                                    color: colorScheme.onSurfaceVariant,
                                   ),
                                 ),
-                                onTap: () => widget.onPayeeSelected(payee),
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  widget.onPayeeSelected(payee);
+                                },
                               ),
-                            ).animate()
-                              .fadeIn(delay: Duration(milliseconds: index * 80))
-                              .slideX(begin: 0.1, end: 0, curve: Curves.easeOutCubic);
+                            );
                           },
                         ),
                       ),
@@ -491,8 +507,9 @@ class _QuickActionsPanelState extends State<QuickActionsPanel> with SingleTicker
           ),
         ],
       ),
-    ).animate()
-      .fadeIn(duration: const Duration(milliseconds: 600))
-      .slideY(begin: 0.1, end: 0);
+    ),
+  ).animate()
+    .fadeIn(duration: const Duration(milliseconds: 600))
+    .slideY(begin: 0.1, end: 0);
   }
 }
