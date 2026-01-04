@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -108,57 +109,263 @@ class _AddBudgetScreenState extends State<AddBudgetScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isEditing = _editingBudget != null;
+    final title = isEditing ? 'Edit Budget' : 'Create Budget';
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(_editingBudget != null ? 'Edit Budget' : 'Add Budget'),
+        title: Text(title),
       ),
-      body: _isSaving
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    DropdownButtonFormField<String>(
-                      value: _category,
-                      decoration: const InputDecoration(labelText: 'Category'),
-                      items: _categories
-                          .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                          .toList(),
-                      onChanged: (v) => setState(() => _category = v!),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        child: _isSaving
+            ? const Center(child: CircularProgressIndicator())
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  final maxWidth = constraints.maxWidth;
+                  final horizontalPadding =
+                      maxWidth > 640 ? (maxWidth - 640) / 2 : 16.0;
+
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(
+                      horizontalPadding,
+                      24,
+                      horizontalPadding,
+                      24,
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _amountController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Budget Amount'),
-                      validator: (v) => (v == null || double.tryParse(v) == null) ? 'Enter valid amount' : null,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        gradient: LinearGradient(
+                          colors: [
+                            colorScheme.surface,
+                            colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.96),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        border: Border.all(
+                          color: colorScheme.outlineVariant
+                              .withValues(alpha: 0.7),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: colorScheme.shadow.withValues(alpha: 0.23),
+                            blurRadius: 22,
+                            offset: const Offset(0, 12),
+                          ),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.primaryContainer
+                                          .withValues(alpha: 0.95),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.pie_chart_outline,
+                                      color: colorScheme.onPrimaryContainer,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          title,
+                                          style: theme.textTheme.titleMedium
+                                              ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          isEditing
+                                              ? 'Adjust this budget to better match your month.'
+                                              : 'Create a budget to guide your spending this month.',
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                            color: colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: (isEditing
+                                              ? colorScheme.secondaryContainer
+                                              : colorScheme.primaryContainer)
+                                          .withValues(alpha: 0.9),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Text(
+                                      isEditing ? 'Editing' : 'New',
+                                      style: theme.textTheme.labelSmall
+                                          ?.copyWith(
+                                        color: isEditing
+                                            ? colorScheme.onSecondaryContainer
+                                            : colorScheme.onPrimaryContainer,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 24),
+                              DropdownButtonFormField<String>(
+                                value: _category,
+                                decoration: InputDecoration(
+                                  labelText: 'Category',
+                                  prefixIcon:
+                                      const Icon(Icons.category_outlined),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                items: _categories
+                                    .map(
+                                      (c) => DropdownMenuItem(
+                                        value: c,
+                                        child: Text(c),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (v) =>
+                                    setState(() => _category = v ?? _category),
+                              ),
+                              const SizedBox(height: 16),
+                              TextFormField(
+                                controller: _amountController,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                  decimal: true,
+                                ),
+                                decoration: InputDecoration(
+                                  labelText: 'Budget Amount',
+                                  hintText: 'e.g. 50,000',
+                                  prefixIcon:
+                                      const Icon(Icons.payments_outlined),
+                                  prefixText: 'KSh ',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                validator: (v) => (v == null ||
+                                        double.tryParse(v) == null)
+                                    ? 'Enter valid amount'
+                                    : null,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Budget Period',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(14),
+                                      onTap: () => _pickDate(isStart: true),
+                                      child: InputDecorator(
+                                        decoration: InputDecoration(
+                                          labelText: 'Start',
+                                          border: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(14),
+                                          ),
+                                          prefixIcon: const Icon(
+                                            Icons.calendar_today_outlined,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          DateFormat.yMMMd()
+                                              .format(_startDate),
+                                          style: theme.textTheme.bodyMedium,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(14),
+                                      onTap: () => _pickDate(isStart: false),
+                                      child: InputDecorator(
+                                        decoration: InputDecoration(
+                                          labelText: 'End',
+                                          border: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(14),
+                                          ),
+                                          prefixIcon: const Icon(
+                                            Icons.calendar_today_outlined,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          DateFormat.yMMMd().format(_endDate),
+                                          style: theme.textTheme.bodyMedium,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 28),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    HapticFeedback.selectionClick();
+                                    _save();
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                  ),
+                                  child: const Text('Save Budget'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(child: Text('Start: ${DateFormat.yMMMd().format(_startDate)}')),
-                        TextButton(onPressed: () => _pickDate(isStart: true), child: const Text('Select')),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(child: Text('End:   ${DateFormat.yMMMd().format(_endDate)}')),
-                        TextButton(onPressed: () => _pickDate(isStart: false), child: const Text('Select')),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(onPressed: _save, child: const Text('Save Budget')),
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
-            ),
+      ),
     );
   }
 }
