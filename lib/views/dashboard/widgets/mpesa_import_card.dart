@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:logging/logging.dart';
 
@@ -100,35 +101,43 @@ class _MpesaImportCardState extends State<MpesaImportCard> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     if (_isLoading) {
-      return _buildLoadingCard();
+      return _buildLoadingCard(theme, colorScheme);
     }
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
         gradient: LinearGradient(
           colors: [
-            Colors.green.shade600,
-            Colors.green.shade700,
+            colorScheme.surface,
+            colorScheme.surfaceContainerHighest.withValues(alpha: 0.9),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.green.withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: colorScheme.shadow.withValues(alpha: 0.25),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           onTap: () {
+            HapticFeedback.selectionClick();
             Navigator.pushNamed(context, '/mpesa_import');
           },
           child: Padding(
@@ -141,12 +150,13 @@ class _MpesaImportCardState extends State<MpesaImportCard> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
+                        color:
+                            colorScheme.primaryContainer.withValues(alpha: 0.9),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.sms,
-                        color: Colors.white,
+                        color: colorScheme.onPrimaryContainer,
                         size: 24,
                       ),
                     ),
@@ -157,51 +167,68 @@ class _MpesaImportCardState extends State<MpesaImportCard> {
                         children: [
                           Text(
                             'M-Pesa Import',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: colorScheme.onSurface,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             _getStatusText(),
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.white.withValues(alpha: 0.9),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
                       ),
                     ),
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.analytics, color: Colors.white, size: 20),
-                          onPressed: () => Navigator.pushNamed(context, '/mpesa_analytics'),
+                          icon: Icon(
+                            Icons.analytics,
+                            color: colorScheme.primary,
+                            size: 20,
+                          ),
+                          onPressed: () {
+                            HapticFeedback.selectionClick();
+                            Navigator.pushNamed(context, '/mpesa_analytics');
+                          },
                           tooltip: 'View Analytics',
                         ),
                         Icon(
                           Icons.arrow_forward_ios,
-                          color: Colors.white.withValues(alpha: 0.7),
+                          color: colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.7),
                           size: 16,
                         ),
                       ],
                     ),
                   ],
                 ),
-                if (_hasPermission && (_importStats['pendingTransactions'] ?? 0) > 0)
+                if (_hasPermission &&
+                    (_importStats['pendingTransactions'] ?? 0) > 0)
                   _buildImportBanner(),
                 if (_hasPermission && _importStats.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      color: colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: colorScheme.outlineVariant
+                            .withValues(alpha: 0.5),
+                      ),
                     ),
                     child: Row(
                       children: [
                         Expanded(
                           child: _buildStatItem(
+                            theme,
+                            colorScheme,
                             'Total Records',
                             '${_importStats['totalMpesaTransactions'] ?? 0}',
                             Icons.receipt_long,
@@ -210,10 +237,13 @@ class _MpesaImportCardState extends State<MpesaImportCard> {
                         Container(
                           width: 1,
                           height: 30,
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color: colorScheme.outlineVariant
+                              .withValues(alpha: 0.5),
                         ),
                         Expanded(
                           child: _buildStatItem(
+                            theme,
+                            colorScheme,
                             'Imported',
                             '${_importStats['importedTransactions'] ?? 0}',
                             Icons.check_circle,
@@ -222,10 +252,13 @@ class _MpesaImportCardState extends State<MpesaImportCard> {
                         Container(
                           width: 1,
                           height: 30,
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color: colorScheme.outlineVariant
+                              .withValues(alpha: 0.5),
                         ),
                         Expanded(
                           child: _buildStatItem(
+                            theme,
+                            colorScheme,
                             'Pending',
                             '${_importStats['pendingTransactions'] ?? 0}',
                             Icons.pending,
@@ -244,85 +277,134 @@ class _MpesaImportCardState extends State<MpesaImportCard> {
   }
 
   Widget _buildImportBanner() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final pending = _importStats['pendingTransactions'] ?? 0;
 
     return Container(
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
+        color: colorScheme.secondaryContainer.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, color: Colors.white, size: 18),
+          Icon(
+            Icons.info_outline,
+            color: colorScheme.onSecondaryContainer,
+            size: 18,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'New M-Pesa SMS detected – Import now? ($pending pending)',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white,
-                  ),
+              'New M-Pesa SMS detected  Import now? ($pending pending)',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSecondaryContainer,
+              ),
             ),
           ),
           const SizedBox(width: 8),
           TextButton(
-            onPressed: _isImporting ? null : _importNow,
+            onPressed: _isImporting
+                ? null
+                : () {
+                    HapticFeedback.selectionClick();
+                    _importNow();
+                  },
             style: TextButton.styleFrom(
-              foregroundColor: Colors.white,
+              foregroundColor: colorScheme.onSecondaryContainer,
+              backgroundColor: colorScheme.onSecondaryContainer
+                  .withValues(alpha: 0.08),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 6,
+              ),
+              shape: const StadiumBorder(),
             ),
             child: _isImporting
-                ? const SizedBox(
+                ? SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      color: colorScheme.onSecondaryContainer,
                     ),
                   )
-                : const Text('Import now'),
+                : Text(
+                    'Import now',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSecondaryContainer,
+                    ),
+                  ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildLoadingCard() {
+  Widget _buildLoadingCard(ThemeData theme, ColorScheme colorScheme) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       height: 120,
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.surface,
+            colorScheme.surfaceContainerHighest.withValues(alpha: 0.9),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+          width: 1,
+        ),
       ),
-      child: const Center(
-        child: CircularProgressIndicator(),
+      child: Center(
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: colorScheme.primary,
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon) {
+  Widget _buildStatItem(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    String label,
+    String value,
+    IconData icon,
+  ) {
     return Column(
       children: [
         Icon(
           icon,
-          color: Colors.white.withValues(alpha: 0.8),
+          color: colorScheme.primary,
           size: 16,
         ),
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: colorScheme.onSurface,
           ),
         ),
         Text(
           label,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.8),
-            fontSize: 10,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
           ),
           textAlign: TextAlign.center,
         ),
