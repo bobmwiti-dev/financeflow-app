@@ -64,6 +64,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   BudgetViewModel? _budgetViewModel;
   final Logger logger = Logger('DashboardScreen');
 
+  bool _incomeChangeScheduled = false;
+
   late final AnimationController _animationController;
   bool _isRefreshing = false;
   bool _isLoading = true;
@@ -182,8 +184,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   /// Called when income data changes to refresh dashboard calculations
   void _onIncomeChanged() {
-    logger.info('Income changed, updating dashboard balance');
-    if (mounted) {
+    if (!mounted) return;
+    if (_incomeChangeScheduled) return;
+    _incomeChangeScheduled = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _incomeChangeScheduled = false;
+      if (!mounted) return;
+
+      logger.info('Income changed, updating dashboard balance');
+
       // Recalculate real balance with new income
       final accountVm = Provider.of<AccountViewModel>(context, listen: false);
       final vm = _transactionViewModel ?? Provider.of<TransactionViewModel>(context, listen: false);
@@ -201,14 +211,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _incomeViewModel.incomeSources,
       );
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          setState(() {
-            _balance = realBalance;
-          });
-        }
+      if (!mounted) return;
+      setState(() {
+        _balance = realBalance;
       });
-    }
+    });
   }
 
   void _onTransactionsUpdated() {
@@ -368,36 +375,34 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       }
       
       // Build income history for Financial Summary Card
-      if (mounted) {
-        final incomeVM = Provider.of<IncomeViewModel>(context, listen: false);
-        _incomeHistory.clear();
-        for (final income in incomeVM.incomeSources) {
+      final incomeVM = _incomeViewModel;
+      _incomeHistory.clear();
+      for (final income in incomeVM.incomeSources) {
           _incomeHistory.add({
             'date': income.date,
             'amount': income.amount,
             'name': income.name,
           });
-        }
-        
-        // Compute previous month baseline (month before currently selected month)
-        final anchorMonth = DateTime(currentMonth.year, currentMonth.month, 1);
-        final previousMonth = DateTime(anchorMonth.year, anchorMonth.month - 1, 1);
-        final prevStart = DateTime(previousMonth.year, previousMonth.month, 1);
-        final prevEnd = DateTime(previousMonth.year, previousMonth.month + 1, 0, 23, 59, 59);
-
-        final prevIncomeFromSources = incomeVM.incomeSources.where((src) =>
-          src.date.year == previousMonth.year && src.date.month == previousMonth.month).fold<double>(0.0, (total, src) => total + src.amount);
-        if (prevIncomeFromSources > 0) {
-          previousIncome = prevIncomeFromSources;
-        }
-
-        previousExpenses = allTransactions
-            .where((t) =>
-                t.isExpense &&
-                !t.date.isBefore(prevStart) &&
-                !t.date.isAfter(prevEnd))
-            .fold<double>(0.0, (sum, t) => sum + t.amount.abs());
       }
+
+      // Compute previous month baseline (month before currently selected month)
+      final anchorMonth = DateTime(currentMonth.year, currentMonth.month, 1);
+      final previousMonth = DateTime(anchorMonth.year, anchorMonth.month - 1, 1);
+      final prevStart = DateTime(previousMonth.year, previousMonth.month, 1);
+      final prevEnd = DateTime(previousMonth.year, previousMonth.month + 1, 0, 23, 59, 59);
+
+      final prevIncomeFromSources = incomeVM.incomeSources.where((src) =>
+        src.date.year == previousMonth.year && src.date.month == previousMonth.month).fold<double>(0.0, (total, src) => total + src.amount);
+      if (prevIncomeFromSources > 0) {
+        previousIncome = prevIncomeFromSources;
+      }
+
+      previousExpenses = allTransactions
+          .where((t) =>
+              t.isExpense &&
+              !t.date.isBefore(prevStart) &&
+              !t.date.isAfter(prevEnd))
+          .fold<double>(0.0, (sum, t) => sum + t.amount.abs());
       
       if (mounted) {
         setState(() {
