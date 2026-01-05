@@ -3,9 +3,17 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../viewmodels/transaction_viewmodel_fixed.dart';
 import '../../../viewmodels/income_viewmodel.dart';
+import '../../../models/monthly_summary.dart';
 
 class KenyaFinancialInsightsCard extends StatelessWidget {
-  const KenyaFinancialInsightsCard({super.key});
+  final DateTime? selectedMonth;
+  final MonthlySummary? summary;
+
+  const KenyaFinancialInsightsCard({
+    super.key,
+    this.selectedMonth,
+    this.summary,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -154,7 +162,8 @@ class KenyaFinancialInsightsCard extends StatelessWidget {
   ) {
     final insights = <KenyaFinancialInsight>[];
     final now = DateTime.now();
-    final currentMonth = DateTime(now.year, now.month);
+    final anchor = selectedMonth ?? DateTime(now.year, now.month);
+    final currentMonth = DateTime(anchor.year, anchor.month);
     
     // Filter current month transactions
     final monthTransactions = transactions.where((tx) {
@@ -164,7 +173,7 @@ class KenyaFinancialInsightsCard extends StatelessWidget {
     
     if (monthTransactions.isEmpty) return insights;
 
-    final totalIncome = incomeViewModel.getTotalIncome();
+    final totalIncome = summary?.income ?? incomeViewModel.getTotalIncome();
     
     // 1. M-Pesa Usage Analysis
     final mpesaTransactions = monthTransactions.where((tx) => 
@@ -175,7 +184,8 @@ class KenyaFinancialInsightsCard extends StatelessWidget {
     
     if (mpesaTransactions.isNotEmpty) {
       final mpesaAmount = mpesaTransactions.fold<double>(0, (sum, tx) => sum + tx.amount.abs());
-      final percentage = (mpesaAmount / _getTotalExpenses(monthTransactions)) * 100;
+      final totalExpenses = summary?.expenses ?? _getTotalExpenses(monthTransactions);
+      final percentage = totalExpenses > 0 ? (mpesaAmount / totalExpenses) * 100 : 0.0;
       
       insights.add(KenyaFinancialInsight(
         title: 'M-Pesa Dominance',
