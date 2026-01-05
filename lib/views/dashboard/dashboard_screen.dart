@@ -41,9 +41,12 @@ import 'package:financeflow_app/constants/app_constants.dart';
 import 'package:financeflow_app/viewmodels/income_viewmodel.dart';
 import 'package:financeflow_app/viewmodels/debt_goals_viewmodel.dart';
 import 'package:financeflow_app/viewmodels/account_viewmodel.dart';
+import 'package:financeflow_app/viewmodels/budget_viewmodel.dart';
 import 'widgets/enhanced_safe_to_spend_card.dart';
 import '../../widgets/account_balance_widget.dart';
 import 'package:financeflow_app/viewmodels/transaction_viewmodel_fixed.dart';
+import 'package:financeflow_app/models/monthly_summary.dart';
+import 'package:financeflow_app/services/monthly_summary_service.dart';
 
 /// Dashboard screen showing financial overview, recent transactions, and quick actions
 class DashboardScreen extends StatefulWidget {
@@ -58,6 +61,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   late TransactionService _transactionService;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   late IncomeViewModel _incomeViewModel;
+  BudgetViewModel? _budgetViewModel;
   final Logger logger = Logger('DashboardScreen');
 
   late final AnimationController _animationController;
@@ -73,6 +77,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   double _expenses = 0.0;
   double _balance = 0.0;
   Map<String, double> _categoryTotals = {};
+  MonthlySummary? _monthlySummary;
   int _selectedMonthIndex = DateTime.now().month - 1;
   int _selectedYear = DateTime.now().year;
   
@@ -105,6 +110,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     _transactionService = Provider.of<TransactionService>(context, listen: false);
     _incomeViewModel = Provider.of<IncomeViewModel>(context, listen: false);
     _transactionViewModel = Provider.of<TransactionViewModel>(context, listen: false);
+    _budgetViewModel = Provider.of<BudgetViewModel>(context, listen: false);
     final smsImportService = Provider.of<SmsImportService>(context, listen: false);
     
     // Listen to income changes and refresh dashboard data
@@ -183,11 +189,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       final vm = _transactionViewModel ?? Provider.of<TransactionViewModel>(context, listen: false);
 
       // Get current month transactions from the view model
-      final now = DateTime.now();
-      final currentMonth = DateTime(now.year, now.month);
+      final currentMonth = _selectedMonthDate;
       final monthTransactions = vm.transactions.where((t) =>
         t.date.year == currentMonth.year && t.date.month == currentMonth.month,
       ).toList();
+
+      _recomputeMonthlySummary(monthTransactions);
 
       final realBalance = accountVm.getTotalBalance(
         monthTransactions,
@@ -214,8 +221,35 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       t.date.year == currentMonth.year && t.date.month == currentMonth.month,
     ).toList();
 
+    _recomputeMonthlySummary(monthTransactions);
+
     logger.info('Processing ${monthTransactions.length} transactions for dashboard (from TransactionViewModel)');
     _processTransactions(monthTransactions);
+  }
+
+  void _recomputeMonthlySummary(List<models.Transaction> monthTransactions) {
+    try {
+      final incomeVm = _incomeViewModel;
+      incomeVm.setSelectedMonth(_selectedMonthDate);
+
+      final budgetVm = _budgetViewModel ?? Provider.of<BudgetViewModel>(context, listen: false);
+
+      final summary = MonthlySummaryService.getSummary(
+        month: _selectedMonthDate,
+        incomeSources: incomeVm.incomeSources,
+        transactions: monthTransactions,
+        budgets: budgetVm.allBudgets.isNotEmpty ? budgetVm.allBudgets : budgetVm.budgets,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _monthlySummary = summary;
+        _expenses = summary.expenses;
+        _categoryTotals = summary.categoryTotals;
+      });
+    } catch (e) {
+      logger.warning('Failed to compute MonthlySummary: $e');
+    }
   }
 
   /// Load initial dashboard data (called once in initState)
@@ -331,12 +365,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           'type': transaction.isExpense ? 'expense' : 'income',
           'category': transaction.category,
         });
-        
-        if (!transaction.isExpense) {
-          previousIncome += transaction.amount.abs();
-        } else {
-          previousExpenses += transaction.amount.abs();
-        }
       }
       
       // Build income history for Financial Summary Card
@@ -351,13 +379,24 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           });
         }
         
-        // Compute previous month income (use the month before current)
-        final previousMonth = DateTime(currentMonth.year, currentMonth.month - 1);
+        // Compute previous month baseline (month before currently selected month)
+        final anchorMonth = DateTime(currentMonth.year, currentMonth.month, 1);
+        final previousMonth = DateTime(anchorMonth.year, anchorMonth.month - 1, 1);
+        final prevStart = DateTime(previousMonth.year, previousMonth.month, 1);
+        final prevEnd = DateTime(previousMonth.year, previousMonth.month + 1, 0, 23, 59, 59);
+
         final prevIncomeFromSources = incomeVM.incomeSources.where((src) =>
           src.date.year == previousMonth.year && src.date.month == previousMonth.month).fold<double>(0.0, (total, src) => total + src.amount);
         if (prevIncomeFromSources > 0) {
           previousIncome = prevIncomeFromSources;
         }
+
+        previousExpenses = allTransactions
+            .where((t) =>
+                t.isExpense &&
+                !t.date.isBefore(prevStart) &&
+                !t.date.isAfter(prevEnd))
+            .fold<double>(0.0, (sum, t) => sum + t.amount.abs());
       }
       
       if (mounted) {
@@ -381,37 +420,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   /// Process transaction data and update dashboard state
   Future<void> _processTransactions(List<models.Transaction> transactions) async {
-    // Calculate financial summary from transaction stream
-    double income = 0.0;
-    double expenses = 0.0;
-    Map<String, double> categoryTotals = {};
-
-    for (final transaction in transactions) {
-      if (!transaction.isExpense) {
-        // Treat transaction type income
-        income += transaction.amount.abs();
-      } else {
-        expenses += transaction.amount.abs();
-      }
-
-      // Update category totals
-      final category = transaction.category;
-      if (transaction.isExpense) {
-        categoryTotals[category] = (categoryTotals[category] ?? 0) + transaction.amount.abs();
-      }
-    }
-
-    // Add income sources from IncomeViewModel so dashboard stays in sync
-    final currentMonth = _selectedMonthDate;
-    final incomeVM = Provider.of<IncomeViewModel>(context, listen: false);
-    incomeVM.setSelectedMonth(currentMonth);
-    final double incomeSourcesTotal = incomeVM.getTotalIncome();
-    logger.info('Income from ViewModel: \$${incomeSourcesTotal.toStringAsFixed(2)}, Transaction income: \$${income.toStringAsFixed(2)}');
-    // Replace transaction-derived income with authoritative income source total if available
-    if (incomeSourcesTotal > 0) {
-      income = incomeSourcesTotal;
-      logger.info('Using ViewModel income as authoritative source');
-    }
+    final expenses = _monthlySummary?.expenses ?? _expenses;
+    final categoryTotals = _monthlySummary?.categoryTotals ?? _categoryTotals;
 
     // Sort transactions by date (newest first)
     transactions.sort((a, b) => b.date.compareTo(a.date));
@@ -436,9 +446,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           setState(() {
-            _expenses = expenses;
             _balance = realBalance;
-            _categoryTotals = categoryTotals;
           });
         }
       });
@@ -653,18 +661,23 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             // This month at a glance
             EnhancedMonthlySummary(
               selectedMonth: _selectedMonthDate,
+              summary: _monthlySummary,
             ).animate().fadeIn(delay: 50.ms, duration: 400.ms),
             const SizedBox(height: 16),
 
             // Financial summary card with chart visualization
             Consumer<IncomeViewModel>(
               builder: (context, incomeViewModel, child) {
+                final summaryIncome = _monthlySummary?.income ?? incomeViewModel.getTotalIncome();
+                final summaryExpenses = _monthlySummary?.expenses ?? _expenses;
+                final summaryCategoryTotals = _monthlySummary?.categoryTotals ?? _categoryTotals;
                 return FinancialSummaryCard(
-                  income: incomeViewModel.getTotalIncome(),
-                  expenses: _expenses,
+                  income: summaryIncome,
+                  expenses: summaryExpenses,
                   balance: _balance,
-                  categoryTotals: _categoryTotals,
+                  categoryTotals: summaryCategoryTotals,
                   isRefreshing: _isRefreshing,
+                  budget: _monthlySummary?.budgetTotal,
                   previousIncome: _previousIncome > 0 ? _previousIncome : null,
                   previousExpenses: _previousExpenses > 0 ? _previousExpenses : null,
                   transactionHistory: _transactionHistory,
@@ -696,9 +709,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             // Goals & emergency fund
             Consumer<IncomeViewModel>(
               builder: (context, incomeViewModel, child) {
+                final summaryIncome = _monthlySummary?.income ?? incomeViewModel.getTotalIncome();
+                final summaryExpenses = _monthlySummary?.expenses ?? _expenses;
                 return UnifiedSavingsCard(
-                  income: incomeViewModel.getTotalIncome(),
-                  expenses: _expenses,
+                  income: summaryIncome,
+                  expenses: summaryExpenses,
                   targetSavingsRate: 0.30,
                   onViewAllGoals: () => Navigator.pushNamed(context, '/goals'),
                   onGoalTap: (goal) => Navigator.pushNamed(context, '/goal_details', arguments: goal),
