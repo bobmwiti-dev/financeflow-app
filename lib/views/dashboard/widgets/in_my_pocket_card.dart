@@ -7,9 +7,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../../../models/monthly_summary.dart';
 
 class InMyPocketCard extends StatefulWidget {
-  const InMyPocketCard({super.key});
+  final DateTime? selectedMonth;
+  final MonthlySummary? summary;
+
+  const InMyPocketCard({
+    super.key,
+    this.selectedMonth,
+    this.summary,
+  });
 
   @override
   State<InMyPocketCard> createState() => _InMyPocketCardState();
@@ -48,7 +56,9 @@ class _InMyPocketCardState extends State<InMyPocketCard> with TickerProviderStat
     final uid = FirebaseAuth.instance.currentUser?.uid;
 
     // Fetch all data concurrently
-    await transactionViewModel.loadTransactionsByMonth(DateTime.now());
+    if (widget.summary == null) {
+      await transactionViewModel.loadTransactionsByMonth(widget.selectedMonth ?? DateTime.now());
+    }
 
     if (uid != null) {
       await billViewModel.loadBills(uid);
@@ -187,8 +197,8 @@ class _InMyPocketCardState extends State<InMyPocketCard> with TickerProviderStat
     final transactionViewModel = Provider.of<fixed.TransactionViewModel>(context);
     final currencyFormat = NumberFormat.currency(locale: 'en_US', symbol: '\$');
 
-    final double totalIncome = transactionViewModel.getTotalIncome();
-    final double totalExpenses = transactionViewModel.getTotalExpenses().abs(); // Ensure positive value
+    final double totalIncome = widget.summary?.income ?? transactionViewModel.getTotalIncome();
+    final double totalExpenses = widget.summary?.expenses ?? transactionViewModel.getTotalExpenses().abs(); // Ensure positive value
     final double safeToSpendAmount = totalIncome - totalExpenses;
     final double totalBalanceAmount = totalIncome;
 
@@ -293,8 +303,8 @@ class _InMyPocketCardState extends State<InMyPocketCard> with TickerProviderStat
     final transactionViewModel = Provider.of<fixed.TransactionViewModel>(context);
     final currencyFormat = NumberFormat.currency(locale: 'en_US', symbol: '\$');
 
-    final totalIncome = transactionViewModel.getTotalIncome();
-    final totalExpenses = transactionViewModel.getTotalExpenses();
+    final totalIncome = widget.summary?.income ?? transactionViewModel.getTotalIncome();
+    final totalExpenses = widget.summary?.expenses ?? transactionViewModel.getTotalExpenses();
     final safeToSpend = totalIncome - totalExpenses;
 
     return Column(
@@ -311,7 +321,7 @@ class _InMyPocketCardState extends State<InMyPocketCard> with TickerProviderStat
         ),
         const SizedBox(height: 12),
         _buildBreakdownRow('Total Income', totalIncome, currencyFormat, Colors.greenAccent),
-        _buildBreakdownRow('Total Expenses', -totalExpenses, currencyFormat, Colors.orangeAccent),
+        _buildBreakdownRow('Total Expenses', -totalExpenses.abs(), currencyFormat, Colors.orangeAccent),
         const Divider(color: Colors.white24, thickness: 1, height: 24),
         _buildBreakdownRow('Safe to Spend', safeToSpend, currencyFormat, Colors.white, isTotal: true),
         const Spacer(),
@@ -330,13 +340,15 @@ class _InMyPocketCardState extends State<InMyPocketCard> with TickerProviderStat
     final transactionViewModel = Provider.of<fixed.TransactionViewModel>(context);
     final currencyFormat = NumberFormat.currency(locale: 'en_US', symbol: '\$');
 
-    final totalIncome = transactionViewModel.getTotalIncome();
-    final totalExpenses = transactionViewModel.getTotalExpenses();
+    final totalIncome = widget.summary?.income ?? transactionViewModel.getTotalIncome();
+    final totalExpenses = widget.summary?.expenses ?? transactionViewModel.getTotalExpenses();
     final safeToSpend = totalIncome - totalExpenses;
 
     final now = DateTime.now();
-    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
-    final daysRemaining = daysInMonth - now.day + 1;
+    final anchor = widget.selectedMonth ?? DateTime(now.year, now.month);
+    final isCurrentMonth = anchor.year == now.year && anchor.month == now.month;
+    final daysInMonth = DateTime(anchor.year, anchor.month + 1, 0).day;
+    final daysRemaining = isCurrentMonth ? (daysInMonth - now.day + 1) : 0;
 
     final dailySafeSpend = daysRemaining > 0 ? safeToSpend / daysRemaining : 0.0;
     final weeklyBudget = dailySafeSpend * 7.0;
