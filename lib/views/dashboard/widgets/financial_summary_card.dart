@@ -3,6 +3,9 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'dart:math' as math;
+
+import '../../../services/monthly_comparison_service.dart';
 
 class FinancialSummaryCard extends StatefulWidget {
   final double income;
@@ -64,6 +67,11 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
       CurvedAnimation(parent: _animationController, curve: Curves.easeOutBack),
     );
     _animationController.forward();
+  }
+
+  DateTime _anchorMonth() {
+    final m = widget.selectedMonth ?? DateTime.now();
+    return DateTime(m.year, m.month, 1);
   }
 
   @override
@@ -247,7 +255,7 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
     }
     
     allDates.sort();
-    final now = DateTime.now();
+    final now = _anchorMonth();
     final earliestDate = allDates.first;
     final monthsAvailable = ((now.year - earliestDate.year) * 12 + now.month - earliestDate.month + 1).clamp(0, 12);
     
@@ -345,44 +353,15 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
     );
   }
 
-
-  List<double> _calculateMonthlyData(bool isIncome) {
-    final monthlyTotals = <DateTime, double>{};
-    
-    if (isIncome) {
-      for (final income in widget.incomeHistory) {
-        if (income['date'] is DateTime && income['amount'] is double) {
-          final date = income['date'] as DateTime;
-          final monthKey = DateTime(date.year, date.month, 1);
-          monthlyTotals[monthKey] = (monthlyTotals[monthKey] ?? 0) + (income['amount'] as double);
-        }
-      }
-    } else {
-      for (final transaction in widget.transactionHistory) {
-        if (transaction['date'] is DateTime && 
-            transaction['amount'] is double && 
-            transaction['type'] == 'expense') {
-          final date = transaction['date'] as DateTime;
-          final monthKey = DateTime(date.year, date.month, 1);
-          monthlyTotals[monthKey] = (monthlyTotals[monthKey] ?? 0) + (transaction['amount'] as double);
-        }
-      }
-    }
-    
-    // Sort by month and return values
-    final sortedMonths = monthlyTotals.keys.toList()..sort();
-    return sortedMonths.map((month) => monthlyTotals[month] ?? 0.0).toList();
-  }
-
   Widget _buildSpendingVelocityCard() {
-    final expenseData = _calculateMonthlyData(false);
-    double velocity = 0.0;
-    
-    if (expenseData.length >= 2) {
-      final current = expenseData.last;
-      final previous = expenseData[expenseData.length - 2];
-      velocity = previous > 0 ? ((current - previous) / previous) * 100 : 0.0;
-    }
+    final monthlyData = _calculateMonthlyTrends();
+    final anchor = _anchorMonth();
+    final previousMonth = MonthlyComparisonService.previousMonth(anchor);
+
+    final current = monthlyData[anchor]?['expenses'] ?? 0.0;
+    final previous = monthlyData[previousMonth]?['expenses'] ?? 0.0;
+    final hasEnoughData = previous > 0;
+    final velocity = hasEnoughData ? ((current - previous) / previous) * 100 : 0.0;
     
     final isAccelerating = velocity > 0;
     
@@ -431,9 +410,7 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
           ),
           const SizedBox(height: 6),
           Text(
-            expenseData.length < 2 
-                ? 'Calc...' 
-                : (isAccelerating ? 'Up' : 'Down'),
+            !hasEnoughData ? 'Calc...' : (isAccelerating ? 'Up' : 'Down'),
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
@@ -443,13 +420,11 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
           ),
           const SizedBox(height: 4),
           Text(
-            expenseData.length < 2 
-                ? 'Need 2mo'
-                : '${velocity.abs().toStringAsFixed(1)}%',
+            !hasEnoughData ? 'Need 2mo' : '${velocity.abs().toStringAsFixed(1)}%',
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w500,
-              color: expenseData.length < 2 
+              color: !hasEnoughData
                   ? colorScheme.onSurfaceVariant
                   : (isAccelerating ? Colors.red : Colors.green),
             ),
@@ -605,7 +580,14 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
     final maxValue = monthlyData.values
         .expand((data) => [data['income'] as double, data['expenses'] as double])
         .reduce((a, b) => a > b ? a : b);
-    final safeMaxY = maxValue == 0 ? 1000 : maxValue * 1.2;
+
+    final maxNetAbs = monthlyData.values
+        .map((data) => ((data['income'] as double) - (data['expenses'] as double)).abs())
+        .fold<double>(0.0, (m, v) => v > m ? v : m);
+
+    final maxAbs = math.max(maxValue, maxNetAbs);
+    final safeMaxY = maxAbs == 0 ? 1000 : maxAbs * 1.2;
+    final safeMinY = -safeMaxY;
     
     return Column(
       children: [
@@ -644,6 +626,7 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
             BarChartData(
               alignment: BarChartAlignment.spaceAround,
               maxY: safeMaxY.toDouble(),
+              minY: safeMinY.toDouble(),
               barTouchData: BarTouchData(
                 enabled: true,
                 touchTooltipData: BarTouchTooltipData(
@@ -724,9 +707,10 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
                 final expenses = data['expenses'] as double;
                 final netFlow = income - expenses;
                 
-                // Highlight current month with different styling
-                final isCurrentMonth = monthKey.year == DateTime.now().year && 
-                                     monthKey.month == DateTime.now().month;
+                // Highlight selected month with different styling
+                final anchorMonth = _anchorMonth();
+                final isSelectedMonth = monthKey.year == anchorMonth.year && 
+                                     monthKey.month == anchorMonth.month;
                 
                 return BarChartGroupData(
                   x: index,
@@ -737,7 +721,7 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
                       gradient: LinearGradient(
                         begin: Alignment.bottomCenter,
                         end: Alignment.topCenter,
-                        colors: isCurrentMonth 
+                        colors: isSelectedMonth 
                             ? [Colors.green.shade400, Colors.green.shade700]
                             : [Colors.green.shade200, Colors.green.shade500],
                       ),
@@ -753,7 +737,7 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
                       gradient: LinearGradient(
                         begin: Alignment.bottomCenter,
                         end: Alignment.topCenter,
-                        colors: isCurrentMonth 
+                        colors: isSelectedMonth 
                             ? [Colors.red.shade400, Colors.red.shade700]
                             : [Colors.red.shade200, Colors.red.shade500],
                       ),
@@ -765,10 +749,11 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
                     ),
                     // Net flow indicator (small bar)
                     BarChartRodData(
-                      toY: netFlow > 0 ? netFlow : 0,
-                      color: netFlow > 0 
-                          ? (isCurrentMonth ? Colors.blue.shade600 : Colors.blue.shade400)
-                          : Colors.transparent,
+                      fromY: 0,
+                      toY: netFlow,
+                      color: netFlow >= 0
+                          ? (isSelectedMonth ? Colors.blue.shade600 : Colors.blue.shade400)
+                          : (isSelectedMonth ? Colors.red.shade600 : Colors.red.shade400),
                       width: 3,
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(2),
@@ -966,7 +951,7 @@ class _FinancialSummaryCardState extends State<FinancialSummaryCard>
     final monthlyTotals = <DateTime, Map<String, double>>{};
     
     // Pre-fill last 8 months with zero data to ensure all months show up (including February)
-    final now = DateTime.now();
+    final now = _anchorMonth();
     for (int i = 7; i >= 0; i--) {
       final monthKey = DateTime(now.year, now.month - i, 1);
       monthlyTotals[monthKey] = {'income': 0.0, 'expenses': 0.0};
