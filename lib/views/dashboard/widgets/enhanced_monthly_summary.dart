@@ -11,14 +11,17 @@ import '../../../viewmodels/income_viewmodel.dart';
 import '../../../viewmodels/budget_viewmodel.dart';
 import '../../../services/logger_service.dart';
 import '../../../utils/currency_extensions.dart';
+import '../../../models/monthly_summary.dart';
 
 /// Enhanced dashboard financial summary widget with modern UI and interactions
 class EnhancedMonthlySummary extends StatefulWidget {
   final DateTime selectedMonth;
+  final MonthlySummary? summary;
 
   const EnhancedMonthlySummary({
     super.key,
     required this.selectedMonth,
+    this.summary,
   });
 
   @override
@@ -130,7 +133,7 @@ class _EnhancedMonthlySummaryState extends State<EnhancedMonthlySummary>
   @override
   void didUpdateWidget(EnhancedMonthlySummary oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedMonth != widget.selectedMonth) {
+    if (oldWidget.selectedMonth != widget.selectedMonth || oldWidget.summary != widget.summary) {
       _loadDataForMonth();
     }
   }
@@ -142,6 +145,9 @@ class _EnhancedMonthlySummaryState extends State<EnhancedMonthlySummary>
   }
 
   void _loadDataForMonth() {
+    if (widget.summary != null) {
+      return;
+    }
     if (_lastLoadedMonth == null || 
         _lastLoadedMonth!.year != widget.selectedMonth.year ||
         _lastLoadedMonth!.month != widget.selectedMonth.month) {
@@ -173,9 +179,9 @@ class _EnhancedMonthlySummaryState extends State<EnhancedMonthlySummary>
         child,
       ) {
         // Get data for selected month
-        final monthlyIncome = _getMonthlyIncome(incomeViewModel);
-        final monthlyExpenses = _getMonthlyExpenses(transactionViewModel);
-        final monthlyBudget = _getMonthlyBudget(budgetViewModel);
+        final monthlyIncome = widget.summary?.income ?? _getMonthlyIncome(incomeViewModel);
+        final monthlyExpenses = widget.summary?.expenses ?? _getMonthlyExpenses(transactionViewModel);
+        final monthlyBudget = widget.summary?.budgetTotal ?? _getMonthlyBudget(budgetViewModel);
         final savings = monthlyIncome - monthlyExpenses;
 
         // Get previous month data for comparison
@@ -196,27 +202,17 @@ class _EnhancedMonthlySummaryState extends State<EnhancedMonthlySummary>
           widget.selectedMonth.month + 1,
           0,
         ).day;
+
         final now = DateTime.now();
-        final selectedMonthStart =
-            DateTime(widget.selectedMonth.year, widget.selectedMonth.month);
-        final currentMonthStart = DateTime(now.year, now.month);
-        final isCurrentMonth = selectedMonthStart == currentMonthStart;
-        final isPastMonth = selectedMonthStart.isBefore(currentMonthStart);
-        final isFutureMonth = selectedMonthStart.isAfter(currentMonthStart);
-
+        final isCurrentMonth =
+            now.year == widget.selectedMonth.year &&
+                now.month == widget.selectedMonth.month;
         final daysElapsed = isCurrentMonth
-            ? now.day.clamp(1, daysInMonth)
-            : isPastMonth
-                ? daysInMonth
-                : 0;
+            ? math.max(1, now.day)
+            : daysInMonth;
 
-        final burnRateDenominator = math.max(1, daysElapsed);
-        final dailyBurnRate = monthlyExpenses / burnRateDenominator;
-        final projectedExpenses = isPastMonth
-            ? monthlyExpenses
-            : isFutureMonth
-                ? 0.0
-                : (dailyBurnRate * daysInMonth);
+        final dailyBurnRate = monthlyExpenses / daysElapsed;
+        final projectedExpenses = dailyBurnRate * daysInMonth;
 
         // Update animations with real data
         _updateAnimations(monthlyIncome, monthlyExpenses, savings);
@@ -290,7 +286,6 @@ class _EnhancedMonthlySummaryState extends State<EnhancedMonthlySummary>
                       dailyBurnRate,
                       projectedExpenses,
                       monthlyBudget,
-                      isPastMonth,
                     ),
                     const SizedBox(height: 16),
                     _buildInsightsSection(context, savingsRate),
@@ -835,8 +830,7 @@ class _EnhancedMonthlySummaryState extends State<EnhancedMonthlySummary>
     );
   }
 
-  Widget _buildSpendingVelocityGauge(BuildContext context, double dailyBurnRate,
-      double projectedExpenses, double? budget, bool isPastMonth) {
+  Widget _buildSpendingVelocityGauge(BuildContext context, double dailyBurnRate, double projectedExpenses, double? budget) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final velocityPercentage = budget != null && budget > 0 ? (projectedExpenses / budget) : 0.0;
@@ -889,7 +883,7 @@ class _EnhancedMonthlySummaryState extends State<EnhancedMonthlySummary>
                   ),
                 ),
                 if (budget != null) Text(
-                  '${isPastMonth ? 'Actual' : 'Projected'}: ${projectedExpenses.toKenyaDualCurrency()}',
+                  'Projected: ${projectedExpenses.toKenyaDualCurrency()}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
