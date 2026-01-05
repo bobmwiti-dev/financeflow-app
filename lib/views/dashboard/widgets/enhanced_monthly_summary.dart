@@ -196,8 +196,27 @@ class _EnhancedMonthlySummaryState extends State<EnhancedMonthlySummary>
           widget.selectedMonth.month + 1,
           0,
         ).day;
-        final dailyBurnRate = monthlyExpenses / daysInMonth;
-        final projectedExpenses = dailyBurnRate * daysInMonth;
+        final now = DateTime.now();
+        final selectedMonthStart =
+            DateTime(widget.selectedMonth.year, widget.selectedMonth.month);
+        final currentMonthStart = DateTime(now.year, now.month);
+        final isCurrentMonth = selectedMonthStart == currentMonthStart;
+        final isPastMonth = selectedMonthStart.isBefore(currentMonthStart);
+        final isFutureMonth = selectedMonthStart.isAfter(currentMonthStart);
+
+        final daysElapsed = isCurrentMonth
+            ? now.day.clamp(1, daysInMonth)
+            : isPastMonth
+                ? daysInMonth
+                : 0;
+
+        final burnRateDenominator = math.max(1, daysElapsed);
+        final dailyBurnRate = monthlyExpenses / burnRateDenominator;
+        final projectedExpenses = isPastMonth
+            ? monthlyExpenses
+            : isFutureMonth
+                ? 0.0
+                : (dailyBurnRate * daysInMonth);
 
         // Update animations with real data
         _updateAnimations(monthlyIncome, monthlyExpenses, savings);
@@ -271,6 +290,7 @@ class _EnhancedMonthlySummaryState extends State<EnhancedMonthlySummary>
                       dailyBurnRate,
                       projectedExpenses,
                       monthlyBudget,
+                      isPastMonth,
                     ),
                     const SizedBox(height: 16),
                     _buildInsightsSection(context, savingsRate),
@@ -815,7 +835,8 @@ class _EnhancedMonthlySummaryState extends State<EnhancedMonthlySummary>
     );
   }
 
-  Widget _buildSpendingVelocityGauge(BuildContext context, double dailyBurnRate, double projectedExpenses, double? budget) {
+  Widget _buildSpendingVelocityGauge(BuildContext context, double dailyBurnRate,
+      double projectedExpenses, double? budget, bool isPastMonth) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final velocityPercentage = budget != null && budget > 0 ? (projectedExpenses / budget) : 0.0;
@@ -868,7 +889,7 @@ class _EnhancedMonthlySummaryState extends State<EnhancedMonthlySummary>
                   ),
                 ),
                 if (budget != null) Text(
-                  'Projected: ${projectedExpenses.toKenyaDualCurrency()}',
+                  '${isPastMonth ? 'Actual' : 'Projected'}: ${projectedExpenses.toKenyaDualCurrency()}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
