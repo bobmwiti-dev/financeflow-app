@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'dart:async';
 
 import '../../models/budget_model.dart';
 import '../../viewmodels/budget_viewmodel.dart';
@@ -34,16 +35,33 @@ class _AddBudgetScreenState extends State<AddBudgetScreen> {
   @override
   void initState() {
     super.initState();
-    // Check if we're editing an existing budget
+    // Check if we're editing an existing budget or creating a new one for the
+    // currently selected month in BudgetViewModel.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final budget = ModalRoute.of(context)?.settings.arguments as Budget?;
+      final routeArgs = ModalRoute.of(context)?.settings.arguments;
+      final budget = routeArgs is Budget ? routeArgs : null;
+
       if (budget != null) {
+        // Edit existing budget: use its own dates and values.
         setState(() {
           _editingBudget = budget;
           _amountController.text = budget.amount.toString();
           _category = budget.category;
           _startDate = budget.startDate;
           _endDate = budget.endDate;
+        });
+      } else {
+        // New budget: align default dates with the currently selected month in
+        // BudgetViewModel so that budgets created from the dashboard appear in
+        // the same month the user is viewing.
+        final viewModel = Provider.of<BudgetViewModel>(context, listen: false);
+        final selected = viewModel.selectedMonth;
+        final startOfMonth = DateTime(selected.year, selected.month, 1);
+        final endOfMonth = DateTime(selected.year, selected.month + 1, 0);
+
+        setState(() {
+          _startDate = startOfMonth;
+          _endDate = endOfMonth;
         });
       }
     });
@@ -72,33 +90,73 @@ class _AddBudgetScreenState extends State<AddBudgetScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+
     setState(() => _isSaving = true);
-    
+
     final viewModel = Provider.of<BudgetViewModel>(context, listen: false);
-    bool success;
-    
-    if (_editingBudget != null) {
-      // Update existing budget
-      final updatedBudget = _editingBudget!.copyWith(
-        category: _category,
-        amount: double.parse(_amountController.text),
-        startDate: _startDate,
-        endDate: _endDate,
-      );
-      success = await viewModel.updateBudget(updatedBudget);
-    } else {
-      // Create new budget
-      final budget = Budget(
-        category: _category,
-        amount: double.parse(_amountController.text),
-        startDate: _startDate,
-        endDate: _endDate,
-      );
-      success = await viewModel.addBudget(budget);
+    bool success = false;
+
+    try {
+      if (_editingBudget != null) {
+        // Update existing budget
+        final updatedBudget = _editingBudget!.copyWith(
+          category: _category,
+          amount: double.parse(_amountController.text),
+          startDate: _startDate,
+          endDate: _endDate,
+        );
+
+        success = await viewModel
+            .updateBudget(updatedBudget)
+            .timeout(const Duration(seconds: 20));
+      } else {
+        // Create new budget
+        final budget = Budget(
+          category: _category,
+          amount: double.parse(_amountController.text),
+          startDate: _startDate,
+          endDate: _endDate,
+        );
+
+        success = await viewModel
+            .addBudget(budget)
+            .timeout(const Duration(seconds: 20));
+      }
+    } on TimeoutException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Saving your budget is taking longer than expected. Please check your internet connection and try again.',
+            ),
+            backgroundColor: Colors.redAccent,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+      success = false;
+    } catch (_) {
+      // Any other unexpected error is surfaced via a generic message; detailed
+      // logging is already handled inside the ViewModel/Firestore service.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to save budget. Please try again.'),
+            backgroundColor: Colors.redAccent,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+      success = false;
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
-    
-    setState(() => _isSaving = false);
-    if (success && mounted) Navigator.pop(context, true);
+
+    if (success && mounted) {
+      Navigator.pop(context, true);
+    }
   }
 
   @override
