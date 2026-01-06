@@ -12,6 +12,10 @@ import '../../../models/transaction_model.dart';
 import '../../../services/balance_service.dart';
 import '../../../utils/currency_extensions.dart';
 
+// Toggle for verbose cash flow logging. Set to true only when actively
+// debugging forecast behaviour to avoid console spam and slowdowns.
+const bool _enableVerboseCashFlowLogging = false;
+
 /// Data model for cash flow points
 class CashFlowPoint {
   final DateTime date;
@@ -138,8 +142,10 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     final historicalPoints = <CashFlowPoint>[];
     
     // Debug: Check available data
-    debugPrint('Cash Flow Debug: Total transactions: ${transactionVm.transactions.length}');
-    debugPrint('Cash Flow Debug: Total income sources: ${incomeVm.incomeSources.length}');
+    if (_enableVerboseCashFlowLogging) {
+      debugPrint('Cash Flow Debug: Total transactions: ${transactionVm.transactions.length}');
+      debugPrint('Cash Flow Debug: Total income sources: ${incomeVm.incomeSources.length}');
+    }
     
     // Find the earliest data to determine how many months we actually have
     final allDates = [
@@ -148,7 +154,9 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     ];
     
     if (allDates.isEmpty) {
-      debugPrint('Cash Flow Debug: No historical data available');
+      if (_enableVerboseCashFlowLogging) {
+        debugPrint('Cash Flow Debug: No historical data available');
+      }
       _historicalData = [];
       _currentBalance = accountVm.getTotalBalance(
         transactionVm.transactions,
@@ -161,7 +169,9 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     final earliestDate = allDates.first;
     final monthsAvailable = ((now.year - earliestDate.year) * 12 + now.month - earliestDate.month).clamp(0, 6);
     
-    debugPrint('Cash Flow Debug: Data available for $monthsAvailable months (from ${earliestDate.month}/${earliestDate.year})');
+    if (_enableVerboseCashFlowLogging) {
+      debugPrint('Cash Flow Debug: Data available for $monthsAvailable months (from ${earliestDate.month}/${earliestDate.year})');
+    }
     
     // Use available months (minimum 1, maximum 6)
     final monthsToProcess = (monthsAvailable == 0) ? 1 : monthsAvailable;
@@ -217,9 +227,11 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     final monthlyExpensePattern = _calculateMonthlyExpensePattern(transactionVm);
     final recurringIncome = _calculateRecurringIncome(incomeVm);
     
-    debugPrint('Cash Flow Debug: Monthly income pattern: $monthlyIncomePattern');
-    debugPrint('Cash Flow Debug: Monthly expense pattern: $monthlyExpensePattern');
-    debugPrint('Cash Flow Debug: Recurring income: \$${recurringIncome.toStringAsFixed(2)}');
+    if (_enableVerboseCashFlowLogging) {
+      debugPrint('Cash Flow Debug: Monthly income pattern: $monthlyIncomePattern');
+      debugPrint('Cash Flow Debug: Monthly expense pattern: $monthlyExpensePattern');
+      debugPrint('Cash Flow Debug: Recurring income: \$${recurringIncome.toStringAsFixed(2)}');
+    }
     
     for (int i = 1; i <= widget.monthsToForecast; i++) {
       final forecastMonth = DateTime(now.year, now.month + i, 1);
@@ -249,7 +261,9 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
       final upcomingBills = _calculateUpcomingBills(billVm, forecastMonth);
       projectedBalance -= upcomingBills;
       
-      debugPrint('Cash Flow Debug: Month ${forecastMonth.month}/${forecastMonth.year} - Projected Income: \$${projectedIncome.toStringAsFixed(2)}, Expenses: \$${projectedExpenses.toStringAsFixed(2)}, Bills: \$${upcomingBills.toStringAsFixed(2)}, Balance: \$${projectedBalance.toStringAsFixed(2)}');
+      if (_enableVerboseCashFlowLogging) {
+        debugPrint('Cash Flow Debug: Month ${forecastMonth.month}/${forecastMonth.year} - Projected Income: \$${projectedIncome.toStringAsFixed(2)}, Expenses: \$${projectedExpenses.toStringAsFixed(2)}, Bills: \$${upcomingBills.toStringAsFixed(2)}, Balance: \$${projectedBalance.toStringAsFixed(2)}');
+      }
       
       forecastPoints.add(CashFlowPoint(
         date: forecastMonth,
@@ -272,7 +286,9 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     }
     
     if (incomeByMonth.isEmpty) {
-      debugPrint('Cash Flow Debug: No income data for averaging, using fallback');
+      if (_enableVerboseCashFlowLogging) {
+        debugPrint('Cash Flow Debug: No income data for averaging, using fallback');
+      }
       return 2500; // Fallback average income
     }
     
@@ -293,7 +309,9 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     
     final avgIncome = totalWeight > 0 ? weightedSum / totalWeight : incomeByMonth.values.reduce((a, b) => a + b) / incomeByMonth.length;
     
-    debugPrint('Cash Flow Debug: Weighted average income calculated from ${incomeByMonth.length} months: \$${avgIncome.toStringAsFixed(2)}');
+    if (_enableVerboseCashFlowLogging) {
+      debugPrint('Cash Flow Debug: Weighted average income calculated from ${incomeByMonth.length} months: \$${avgIncome.toStringAsFixed(2)}');
+    }
     return avgIncome;
   }
 
@@ -338,7 +356,9 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     }
     
     if (expensesByMonth.isEmpty) {
-      debugPrint('Cash Flow Debug: No expense data for averaging, using fallback');
+      if (_enableVerboseCashFlowLogging) {
+        debugPrint('Cash Flow Debug: No expense data for averaging, using fallback');
+      }
       return 2000; // Fallback average expenses
     }
     
@@ -372,7 +392,9 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
     
     final avgExpenses = totalWeight > 0 ? weightedSum / totalWeight : expensesByMonth.values.reduce((a, b) => a + b) / expensesByMonth.length;
     
-    debugPrint('Cash Flow Debug: Weighted average expenses calculated from ${expensesByMonth.length} months: \$${avgExpenses.toStringAsFixed(2)}');
+    if (_enableVerboseCashFlowLogging) {
+      debugPrint('Cash Flow Debug: Weighted average expenses calculated from ${expensesByMonth.length} months: \$${avgExpenses.toStringAsFixed(2)}');
+    }
     return avgExpenses;
   }
 
@@ -554,7 +576,9 @@ class _EnhancedCashFlowForecastCardState extends State<EnhancedCashFlowForecastC
       }
     }
     
-    debugPrint('Cash Flow Debug: Calculated upcoming bills for ${DateFormat('MMM yyyy').format(forecastMonth)}: \$${upcomingBills.toStringAsFixed(2)}');
+    if (_enableVerboseCashFlowLogging) {
+      debugPrint('Cash Flow Debug: Calculated upcoming bills for ${DateFormat('MMM yyyy').format(forecastMonth)}: \$${upcomingBills.toStringAsFixed(2)}');
+    }
     return upcomingBills;
   }
 
