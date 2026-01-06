@@ -6,6 +6,9 @@ import '../models/income_source_model.dart';
 /// Service for calculating real account balances based on starting balance + transactions
 class BalanceService {
   static const String _logTag = 'BalanceService';
+  // Toggle for verbose per-account logging. Set to true only when actively
+  // diagnosing balance calculations to avoid excessive console output.
+  static const bool _enableVerboseLogging = false;
 
   /// Calculate current balance for a specific account
   static double calculateAccountBalance(
@@ -47,12 +50,14 @@ class BalanceService {
                            incomeFromTransactions - 
                            totalExpenses;
 
-      debugPrint('$_logTag: Account ${account.name} balance calculation:');
-      debugPrint('  Starting: ${account.startingBalance.toStringAsFixed(2)}');
-      debugPrint('  Income Sources: ${totalIncome.toStringAsFixed(2)}');
-      debugPrint('  Income Transactions: ${incomeFromTransactions.toStringAsFixed(2)}');
-      debugPrint('  Expenses: ${totalExpenses.toStringAsFixed(2)}');
-      debugPrint('  Current Balance: ${currentBalance.toStringAsFixed(2)}');
+      if (_enableVerboseLogging) {
+        debugPrint('$_logTag: Account ${account.name} balance calculation:');
+        debugPrint('  Starting: ${account.startingBalance.toStringAsFixed(2)}');
+        debugPrint('  Income Sources: ${totalIncome.toStringAsFixed(2)}');
+        debugPrint('  Income Transactions: ${incomeFromTransactions.toStringAsFixed(2)}');
+        debugPrint('  Expenses: ${totalExpenses.toStringAsFixed(2)}');
+        debugPrint('  Current Balance: ${currentBalance.toStringAsFixed(2)}');
+      }
 
       return currentBalance;
     } catch (e) {
