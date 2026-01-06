@@ -25,7 +25,12 @@ import '../../widgets/notification_badge.dart';
 import '../../utils/currency_extensions.dart';
 
 class ReportsScreen extends StatefulWidget {
-  const ReportsScreen({super.key});
+  final bool focusExpenseOptimization;
+
+  const ReportsScreen({
+    super.key,
+    this.focusExpenseOptimization = false,
+  });
 
   @override
   State<ReportsScreen> createState() => _ReportsScreenState();
@@ -39,6 +44,9 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
   final ValueNotifier<DateTime> _selectedMonthNotifier = ValueNotifier(
     DateTime(DateTime.now().year, DateTime.now().month, 1),
   );
+  final GlobalKey _expenseOptimizationKey = GlobalKey();
+  final ScrollController _scrollController = ScrollController();
+  bool _hasScrolledToExpenseOptimization = false;
   
   @override
   void initState() {
@@ -145,12 +153,32 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
   @override
   void dispose() {
     _selectedMonthNotifier.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _scrollToExpenseOptimization() {
+    if (_hasScrolledToExpenseOptimization) return;
+    final context = _expenseOptimizationKey.currentContext;
+    if (context == null) return;
+
+    _hasScrolledToExpenseOptimization = true;
+    Scrollable.ensureVisible(
+      context,
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.easeInOut,
+    );
   }
 
 
   @override
   Widget build(BuildContext context) {
+    if (widget.focusExpenseOptimization && !_hasScrolledToExpenseOptimization) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToExpenseOptimization();
+      });
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Reports'),
@@ -187,6 +215,7 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
         onItemSelected: _onItemSelected,
       ),
       body: SingleChildScrollView(
+        controller: _scrollController,
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -240,13 +269,17 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
               const SizedBox(height: 16),
               
               // Expense Optimization Card (New)
-              Consumer2<TransactionViewModel, IncomeViewModel>(
-                builder: (context, transactionViewModel, incomeViewModel, _) {
-                  return ExpenseOptimizationCard(
-                    selectedPeriod: TimePeriod.currentMonth(),
-                    allTransactions: transactionViewModel.allTransactions,
-                  );
-                },
+              Container(
+                key: _expenseOptimizationKey,
+                child: Consumer2<TransactionViewModel, IncomeViewModel>(
+                  builder: (context, transactionViewModel, incomeViewModel, _) {
+                    return ExpenseOptimizationCard(
+                      selectedPeriod: TimePeriod.currentMonth(),
+                      allTransactions: transactionViewModel.allTransactions,
+                      highlightOnInit: widget.focusExpenseOptimization,
+                    );
+                  },
+                ),
               ),
               const SizedBox(height: 16),
               

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -12,6 +13,7 @@ import '../../themes/app_theme.dart';
 import '../../utils/category_icons.dart';
 import '../add_transaction/add_transaction_screen.dart';
 import '../transactions/transaction_form_screen.dart';
+import '../reports/reports_screen.dart';
 
 
 class ExpensesScreen extends StatefulWidget {
@@ -47,6 +49,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     _selectedMonthNotifier.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  bool _isDenseLayout(BuildContext context) {
+    if (!kIsWeb) return false;
+    final size = MediaQuery.of(context).size;
+    return size.width >= 900;
   }
 
   void _onItemSelected(int index) {
@@ -207,8 +215,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   }
 
   Widget _buildEnhancedHeader(TransactionViewModel viewModel) {
+    final isDense = _isDenseLayout(context);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: isDense ? 8 : 16,
+      ),
       child: Column(
         children: [
           // Month Selector Row
@@ -275,7 +290,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isDense ? 8 : 12),
           // Search and Filter Row
           Row(
             children: [
@@ -353,6 +368,46 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 ),
               ),
             ],
+          ),
+          if (!isDense) const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                _buildHeaderActionChip(
+                  theme: theme,
+                  background: colorScheme.primaryContainer,
+                  foreground: colorScheme.onPrimaryContainer,
+                  icon: Icons.insights_rounded,
+                  label: 'View Reports',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const ReportsScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildHeaderActionChip(
+                  theme: theme,
+                  background: colorScheme.secondaryContainer,
+                  foreground: colorScheme.onSecondaryContainer,
+                  icon: Icons.auto_graph_rounded,
+                  label: 'Optimize Spending',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const ReportsScreen(
+                          focusExpenseOptimization: true,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -450,7 +505,45 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
+  Widget _buildHeaderActionChip({
+    required ThemeData theme,
+    required Color background,
+    required Color foreground,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: foreground),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: foreground,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildContent(TransactionViewModel viewModel, DateTime selectedMonth) {
+    final isDense = _isDenseLayout(context);
+
     var expenses = viewModel.transactions
         .where((t) =>
             t.type == TransactionType.expense &&
@@ -494,44 +587,48 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.all(16.0),
+      padding: EdgeInsets.symmetric(
+        horizontal: 16.0,
+        vertical: isDense ? 8.0 : 16.0,
+      ),
       children: [
         _buildEnhancedExpenseSummary(viewModel, selectedMonth, expenses),
-        const SizedBox(height: 16),
+        SizedBox(height: isDense ? 10 : 16),
         _buildExpenseStats(expenses),
-        const SizedBox(height: 16),
+        SizedBox(height: isDense ? 10 : 16),
         ...expenses.map((expense) => _buildEnhancedExpenseCard(expense)),
       ],
     );
   }
 
   Widget _buildEmptyState(DateTime selectedMonth) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDense = _isDenseLayout(context);
+
     return Center(
       child: Container(
-        margin: const EdgeInsets.all(32.0),
+        margin: EdgeInsets.all(isDense ? 24.0 : 32.0),
         padding: const EdgeInsets.all(40.0),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Colors.white, Color(0xFFFDFDFD)],
+          gradient: LinearGradient(
+            colors: [
+              colorScheme.surface,
+              colorScheme.surfaceContainerHighest,
+            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: Colors.grey.withValues(alpha: 0.08),
+            color: colorScheme.outlineVariant.withValues(alpha: 0.6),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-              spreadRadius: 0,
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: colorScheme.shadow.withValues(alpha: 0.08),
+              blurRadius: 24,
+              offset: const Offset(0, 14),
               spreadRadius: 0,
             ),
           ],
@@ -644,15 +741,45 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
     // If no expenses for selected month, show "No data" message
     if (expenses.isEmpty) {
-      return Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      final theme = Theme.of(context);
+      final colorScheme = theme.colorScheme;
+      final isDense = _isDenseLayout(context);
+
+      return Container(
+        margin: EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: isDense ? 4 : 8,
+        ),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              colorScheme.surface,
+              colorScheme.surfaceContainerHighest,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: colorScheme.shadow.withValues(alpha: 0.08),
+              blurRadius: 24,
+              offset: const Offset(0, 14),
+              spreadRadius: 0,
+            ),
+          ],
+        ),
         child: const Padding(
-          padding: EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(20.0),
           child: Center(
             child: Text(
               'No expense data to display for this month.',
               style: TextStyle(fontSize: 16, fontStyle: FontStyle.italic),
+              textAlign: TextAlign.center,
             ),
           ),
         ),
@@ -672,30 +799,34 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       );
     }
 
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDense = _isDenseLayout(context);
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      margin: EdgeInsets.symmetric(
+        horizontal: 20,
+        vertical: isDense ? 4 : 8,
+      ),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Colors.white, Color(0xFFFDFDFD)],
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          colors: [
+            colorScheme.surface,
+            colorScheme.surfaceContainerHighest,
+          ],
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: Colors.grey.withAlpha(8),
+          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(4),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: Colors.black.withAlpha(2),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
+            color: colorScheme.shadow.withValues(alpha: 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 14),
             spreadRadius: 0,
           ),
         ],
@@ -919,17 +1050,32 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final largestExpense = expenses.reduce((a, b) => 
         a.amount.abs() > b.amount.abs() ? a : b);
     
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.blue.shade50, Colors.indigo.shade50],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          colors: [
+            colorScheme.surface,
+            colorScheme.surfaceContainerHighest,
+          ],
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.blue.withAlpha(10)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -994,30 +1140,34 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     // Using toCurrency() for Kenya-focused display
     final dateFormat = DateFormat('MMM dd');
     
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDense = _isDenseLayout(context);
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      margin: EdgeInsets.symmetric(
+        horizontal: 20,
+        vertical: isDense ? 4 : 6,
+      ),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Colors.white, Color(0xFFFDFDFD)],
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          colors: [
+            colorScheme.surface,
+            colorScheme.surfaceContainerHighest,
+          ],
         ),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: Colors.grey.withValues(alpha: 0.08),
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.01),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
+            color: colorScheme.shadow.withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
             spreadRadius: 0,
           ),
         ],

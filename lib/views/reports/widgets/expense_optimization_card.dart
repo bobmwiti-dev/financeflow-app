@@ -8,11 +8,13 @@ import 'report_card.dart';
 class ExpenseOptimizationCard extends StatefulWidget {
   final TimePeriod selectedPeriod;
   final List<Transaction> allTransactions;
+  final bool highlightOnInit;
 
   const ExpenseOptimizationCard({
     super.key,
     required this.selectedPeriod,
     required this.allTransactions,
+    this.highlightOnInit = false,
   });
 
   @override
@@ -407,12 +409,42 @@ class _ExpenseOptimizationCardState extends State<ExpenseOptimizationCard>
 
   @override
   Widget build(BuildContext context) {
-    return ReportCard(
+    final base = ReportCard(
       title: '💡 Expense Optimization - ${widget.selectedPeriod.displayName}',
       child: _isAnalyzing ? _buildAnalyzingState() : _buildOptimizationsContent(),
-    ).animate()
-      .fadeIn(duration: 500.ms)
-      .slideY(begin: 0.2, duration: 500.ms, curve: Curves.easeOutCubic);
+    );
+
+    var animated = base
+        .animate()
+        .fadeIn(duration: 500.ms)
+        .slideY(begin: 0.2, duration: 500.ms, curve: Curves.easeOutCubic);
+
+    if (widget.highlightOnInit) {
+      animated = animated
+          .scale(
+            begin: const Offset(1.0, 1.0),
+            end: const Offset(1.03, 1.03),
+            duration: 280.ms,
+            curve: Curves.easeOut,
+          )
+          .then(delay: 80.ms)
+          .scale(
+            end: const Offset(1.0, 1.0),
+            duration: 260.ms,
+            curve: Curves.easeInOut,
+          )
+          .tint(
+            color: Colors.amber.withValues(alpha: 0.08),
+            duration: 220.ms,
+          )
+          .then()
+          .tint(
+            color: Colors.transparent,
+            duration: 220.ms,
+          );
+    }
+
+    return animated;
   }
 
   Widget _buildAnalyzingState() {
