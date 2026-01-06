@@ -107,6 +107,7 @@ class AccountSelectorWidget extends StatelessWidget {
   Widget _buildAccountItem(Account account) {
     return IntrinsicHeight(
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           // Account type icon
           Container(
@@ -153,14 +154,19 @@ class AccountSelectorWidget extends StatelessWidget {
           const SizedBox(width: 8),
           
           // Current balance
-          Text(
-            'KES ${account.startingBalance.toStringAsFixed(0)}',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: account.startingBalance >= 0 
-                  ? AppTheme.incomeColor 
-                  : AppTheme.expenseColor,
-              fontSize: 14,
+          Flexible(
+            fit: FlexFit.loose,
+            child: Text(
+              'KES ${account.startingBalance.toStringAsFixed(0)}',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: account.startingBalance >= 0 
+                    ? AppTheme.incomeColor 
+                    : AppTheme.expenseColor,
+                fontSize: 14,
+              ),
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
             ),
           ),
         ],
