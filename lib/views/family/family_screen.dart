@@ -85,30 +85,7 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
           return CustomScrollView(
             slivers: [
               _buildEnhancedAppBar(viewModel),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      if (viewModel.isLoading && !viewModel.hasFamilyMembers)
-                        _buildLoadingState()
-                      else if (viewModel.hasError)
-                        _buildErrorState(viewModel)
-                      else if (!viewModel.hasFamilyMembers)
-                        _buildEnhancedEmptyState()
-                      else ...[
-                        _buildEnhancedFamilySummary(context, viewModel),
-                        const SizedBox(height: 24),
-                        _buildQuickActionsCard(viewModel),
-                        const SizedBox(height: 24),
-                        _buildBudgetSharingCard(viewModel),
-                        const SizedBox(height: 24),
-                        _buildEnhancedFamilyMemberList(context, viewModel),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
+              ..._buildBodySlivers(context, viewModel),
             ],
           );
         },
@@ -769,9 +746,65 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
           ],
         ),
         const SizedBox(height: 16),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
+      ],
+    );
+  }
+
+  List<Widget> _buildBodySlivers(BuildContext context, FamilyViewModel viewModel) {
+    if (viewModel.isLoading && !viewModel.hasFamilyMembers) {
+      return [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: _buildLoadingState(),
+          ),
+        ),
+      ];
+    }
+
+    if (viewModel.hasError) {
+      return [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: _buildErrorState(viewModel),
+          ),
+        ),
+      ];
+    }
+
+    if (!viewModel.hasFamilyMembers) {
+      return [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: _buildEnhancedEmptyState(),
+          ),
+        ),
+      ];
+    }
+
+    return [
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              _buildEnhancedFamilySummary(context, viewModel),
+              const SizedBox(height: 24),
+              _buildQuickActionsCard(viewModel),
+              const SizedBox(height: 24),
+              _buildBudgetSharingCard(viewModel),
+              const SizedBox(height: 24),
+              _buildEnhancedFamilyMemberHeader(context, viewModel),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        sliver: SliverList.builder(
           itemCount: viewModel.familyMembers.length,
           itemBuilder: (context, index) {
             final member = viewModel.familyMembers[index];
@@ -804,6 +837,39 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
               .fadeIn(delay: (300 + (index * 100)).ms, duration: 600.ms)
               .slideX(begin: 0.3, duration: 600.ms);
           },
+        ),
+      ),
+      const SliverToBoxAdapter(
+        child: SizedBox(height: 24),
+      ),
+    ];
+  }
+
+  Widget _buildEnhancedFamilyMemberHeader(BuildContext context, FamilyViewModel viewModel) {
+    return Row(
+      children: [
+        const Text(
+          'Family Members',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppTheme.primaryColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            '${viewModel.familyMembers.length} members',
+            style: TextStyle(
+              color: AppTheme.primaryColor,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
         ),
       ],
     );
