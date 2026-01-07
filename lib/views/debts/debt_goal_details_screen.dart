@@ -49,52 +49,60 @@ class _DebtGoalDetailsScreenState extends State<DebtGoalDetailsScreen> {
         onPressed: () => _showAddPaymentDialog(context),
         child: const Icon(Icons.add),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Debt Summary', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              _buildInfoRow('Original Amount', currency.format(original)),
-              _buildInfoRow('Remaining Balance', currency.format(remaining)),
-              _buildInfoRow('Paid So Far', currency.format(paid)),
-              _buildInfoRow('Interest Rate', '${widget.goal.interestRate.toStringAsFixed(2)}%'),
-              _buildInfoRow('Minimum Monthly Payment', currency.format(widget.goal.minimumMonthlyPayment)),
-              if (widget.goal.targetDate != null)
-                _buildInfoRow('Target Date', DateFormat.yMMMd().format(widget.goal.targetDate!)),
-              if (projectedDate != null)
-                _buildInfoRow('Estimated Payoff', DateFormat.yMMMd().format(projectedDate)),
-              const SizedBox(height: 24),
-              LinearProgressIndicator(value: (paidPercent / 100).clamp(0, 1), minHeight: 10),
-              const SizedBox(height: 8),
-              Text('Progress: ${paidPercent.toStringAsFixed(1)}%'),
-              const SizedBox(height: 24),
-              Text('Payments', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              payments.isEmpty
-                  ? const Text('No payments yet')
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: payments.length,
-                      separatorBuilder: (_, __) => const Divider(),
-                      itemBuilder: (_, index) {
-                        final p = payments[index];
-                        return ListTile(
-                          title: Text(currency.format(p.amount)),
-                          subtitle: Text(DateFormat.yMMMd().format(p.date)),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline),
-                            onPressed: () => vm.deletePayment(p.id!, goalId),
-                          ),
-                        );
-                      },
-                    ),
-            ],
+      body: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.all(16),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Debt Summary', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 12),
+                  _buildInfoRow('Original Amount', currency.format(original)),
+                  _buildInfoRow('Remaining Balance', currency.format(remaining)),
+                  _buildInfoRow('Paid So Far', currency.format(paid)),
+                  _buildInfoRow('Interest Rate', '${widget.goal.interestRate.toStringAsFixed(2)}%'),
+                  _buildInfoRow('Minimum Monthly Payment', currency.format(widget.goal.minimumMonthlyPayment)),
+                  if (widget.goal.targetDate != null)
+                    _buildInfoRow('Target Date', DateFormat.yMMMd().format(widget.goal.targetDate!)),
+                  if (projectedDate != null)
+                    _buildInfoRow('Estimated Payoff', DateFormat.yMMMd().format(projectedDate)),
+                  const SizedBox(height: 24),
+                  LinearProgressIndicator(value: (paidPercent / 100).clamp(0, 1), minHeight: 10),
+                  const SizedBox(height: 8),
+                  Text('Progress: ${paidPercent.toStringAsFixed(1)}%'),
+                  const SizedBox(height: 24),
+                  Text('Payments', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  if (payments.isEmpty) const Text('No payments yet'),
+                ],
+              ),
+            ),
           ),
-        ),
+          if (payments.isNotEmpty)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverList.separated(
+                itemCount: payments.length,
+                separatorBuilder: (_, __) => const Divider(),
+                itemBuilder: (_, index) {
+                  final p = payments[index];
+                  return ListTile(
+                    title: Text(currency.format(p.amount)),
+                    subtitle: Text(DateFormat.yMMMd().format(p.date)),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => vm.deletePayment(p.id!, goalId),
+                    ),
+                  );
+                },
+              ),
+            ),
+          const SliverToBoxAdapter(
+            child: SizedBox(height: 16),
+          ),
+        ],
       ),
     );
   }
