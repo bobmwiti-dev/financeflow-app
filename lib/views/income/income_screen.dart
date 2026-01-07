@@ -198,6 +198,9 @@ class _IncomeScreenState extends State<IncomeScreen> {
   }
 
   Widget _buildEnhancedHeader(IncomeViewModel viewModel) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       margin: const EdgeInsets.all(16),
       child: Column(
@@ -206,18 +209,23 @@ class _IncomeScreenState extends State<IncomeScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Colors.white, Color(0xFFFDFDFD)],
+              gradient: LinearGradient(
+                colors: [
+                  colorScheme.surface,
+                  colorScheme.surfaceContainerHighest,
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.withValues(alpha: 0.08)),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 12,
-                  offset: const Offset(0, 2),
+                  color: colorScheme.shadow.withValues(alpha: 0.06),
+                  blurRadius: 20,
+                  offset: const Offset(0, 12),
                 ),
               ],
             ),
@@ -284,9 +292,9 @@ class _IncomeScreenState extends State<IncomeScreen> {
                       border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.02),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+                          color: colorScheme.shadow.withValues(alpha: 0.05),
+                          blurRadius: 14,
+                          offset: const Offset(0, 8),
                         ),
                       ],
                     ),
@@ -489,7 +497,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
   }
 
   Widget _buildContent(IncomeViewModel viewModel) {
-    var incomeSources = viewModel.incomeSources;
+    var incomeSources = viewModel.getFilteredIncomeSources();
 
     // Apply search filter
     if (_searchQuery.isNotEmpty) {
@@ -529,7 +537,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
     if (filteredSources.isEmpty) {
       return _buildEmptyState();
     }
-    
+
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: Padding(
@@ -573,32 +581,32 @@ class _IncomeScreenState extends State<IncomeScreen> {
   }
 
   Widget _buildEmptyState() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Center(
       child: Container(
         margin: const EdgeInsets.all(32.0),
         padding: const EdgeInsets.all(40.0),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Colors.white, Color(0xFFFDFDFD)],
+          gradient: LinearGradient(
+            colors: [
+              colorScheme.surface,
+              colorScheme.surfaceContainerHighest,
+            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: Colors.grey.withValues(alpha: 0.08),
+            color: colorScheme.outlineVariant.withValues(alpha: 0.6),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-              spreadRadius: 0,
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: colorScheme.shadow.withValues(alpha: 0.08),
+              blurRadius: 24,
+              offset: const Offset(0, 14),
               spreadRadius: 0,
             ),
           ],
@@ -708,40 +716,63 @@ class _IncomeScreenState extends State<IncomeScreen> {
             ),
           ],
         ),
-      ).animate()
-        .fadeIn(duration: const Duration(milliseconds: 600))
-        .slideY(begin: 0.1, end: 0),
-    );
+      ),
+    ).animate()
+      .fadeIn(duration: const Duration(milliseconds: 600))
+      .slideY(begin: 0.1, end: 0);
   }
 
   Widget _buildEnhancedIncomeSummary(IncomeViewModel viewModel, List<IncomeSource> incomeSources) {
     // Using toKenyaDualCurrency() for Kenya market
     final totalIncome = viewModel.getTotalIncome();
+    final distribution = viewModel.getIncomeDistribution();
+
+    String? topType;
+    double topShare = 0;
+    if (distribution.isNotEmpty && totalIncome > 0) {
+      final topEntry = distribution.entries.reduce(
+        (a, b) => a.value >= b.value ? a : b,
+      );
+      topType = topEntry.key;
+      topShare = (topEntry.value / totalIncome) * 100;
+    }
+
+    final recurringIncomeTotal = viewModel
+        .getRecurringIncome()
+        .fold<double>(0.0, (sum, s) => sum + s.amount);
+
+    final recurringShare = totalIncome > 0
+        ? (recurringIncomeTotal / totalIncome) * 100
+        : 0.0;
+
+    final selectedMonth = viewModel.selectedMonth ?? DateTime.now();
+    final daysInMonth = DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
+    final dailyAverage = daysInMonth > 0 ? totalIncome / daysInMonth : 0.0;
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Colors.white, Color(0xFFFDFDFD)],
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          colors: [
+            colorScheme.surface,
+            colorScheme.surfaceContainerHighest,
+          ],
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: Colors.grey.withValues(alpha: 0.08),
+          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
+            color: colorScheme.shadow.withValues(alpha: 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 14),
             spreadRadius: 0,
           ),
         ],
@@ -825,6 +856,48 @@ class _IncomeScreenState extends State<IncomeScreen> {
             ),
             const SizedBox(height: 8),
             _buildIncomeDistribution(viewModel),
+            if (distribution.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (topType != null)
+                        Text(
+                          'Top: $topType (${topShare.toStringAsFixed(1)}%)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      Text(
+                        'Avg / day: ${dailyAverage.toKenyaDualCurrency()}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[700],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (recurringIncomeTotal > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4.0),
+                      child: Text(
+                        'Recurring: ${recurringIncomeTotal.toKenyaDualCurrency()} (${recurringShare.toStringAsFixed(1)}% of total)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[700],
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -872,39 +945,60 @@ class _IncomeScreenState extends State<IncomeScreen> {
     return Column(
       children: distribution.entries.map((entry) {
         final percentage = (entry.value / totalIncome) * 100;
+        final typeColor = _getIncomeTypeColor(entry.key);
+        final isSelected = _selectedType == entry.key;
         
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    entry.key,
-                    style: const TextStyle(
-                      fontSize: 14,
-                    ),
-                  ),
-                  Text(
-                    '${percentage.toStringAsFixed(1)}%',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+        return InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            setState(() {
+              _selectedType = _selectedType == entry.key ? 'All' : entry.key;
+            });
+          },
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isSelected ? typeColor.withValues(alpha: 0.08) : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected
+                    ? typeColor.withValues(alpha: 0.5)
+                    : Colors.grey.shade200,
               ),
-              const SizedBox(height: 4),
-              LinearProgressIndicator(
-                value: entry.value / totalIncome,
-                backgroundColor: Colors.grey.shade200,
-                valueColor: AlwaysStoppedAnimation<Color>(_getIncomeTypeColor(entry.key)),
-                minHeight: 8,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      entry.key,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      '${percentage.toStringAsFixed(1)}%',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                LinearProgressIndicator(
+                  value: entry.value / totalIncome,
+                  backgroundColor: Colors.grey.shade200,
+                  valueColor: AlwaysStoppedAnimation<Color>(typeColor),
+                  minHeight: 8,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ],
+            ),
           ),
         );
       }).toList(),
@@ -923,17 +1017,33 @@ class _IncomeScreenState extends State<IncomeScreen> {
         : null;
     final recurringCount = incomeSources.where((s) => s.isRecurring).length;
     
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isRecurringActive = _selectedType == 'Recurring';
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.green.shade50, Colors.teal.shade50],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          colors: [
+            colorScheme.surface,
+            colorScheme.surfaceContainerHighest,
+          ],
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.green.withValues(alpha: 0.1)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -951,12 +1061,24 @@ class _IncomeScreenState extends State<IncomeScreen> {
                 : 0.0.toKenyaDualCurrency(),
             Icons.trending_up,
             Colors.blue,
+            onTap: () {
+              setState(() {
+                _sortBy = 'amount';
+                _sortAscending = false;
+              });
+            },
           ),
           _buildStatItem(
             'Recurring',
             '$recurringCount',
             Icons.repeat,
             Colors.purple,
+            onTap: () {
+              setState(() {
+                _selectedType = _selectedType == 'Recurring' ? 'All' : 'Recurring';
+              });
+            },
+            isActive: isRecurringActive,
           ),
         ],
       ),
@@ -965,16 +1087,20 @@ class _IncomeScreenState extends State<IncomeScreen> {
       .slideX(begin: 0.1, end: 0);
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
-    return Column(
+  Widget _buildStatItem(String label, String value, IconData icon, Color color,
+      {VoidCallback? onTap, bool isActive = false}) {
+    final effectiveColor = isActive ? color : color.withAlpha(230);
+    final backgroundColor = isActive ? color.withValues(alpha: 0.18) : color.withValues(alpha: 0.08);
+
+    final content = Column(
       children: [
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: color, size: 20),
+          child: Icon(icon, color: effectiveColor, size: 20),
         ),
         const SizedBox(height: 8),
         Text(
@@ -982,7 +1108,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: color,
+            color: effectiveColor,
           ),
         ),
         Text(
@@ -994,36 +1120,49 @@ class _IncomeScreenState extends State<IncomeScreen> {
         ),
       ],
     );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: content,
+      ),
+    );
   }
 
   Widget _buildEnhancedIncomeCard(IncomeSource source) {
     // Using toKenyaDualCurrency() for Kenya market
     final dateFormat = DateFormat('MMM dd');
     
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Colors.white, Color(0xFFFDFDFD)],
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.surface,
+            colorScheme.surfaceContainerHighest,
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: Colors.grey.withValues(alpha: 0.08),
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.01),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
+            color: colorScheme.shadow.withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
             spreadRadius: 0,
           ),
         ],
@@ -1223,6 +1362,13 @@ class _IncomeScreenState extends State<IncomeScreen> {
       child: IconButton(
         onPressed: onPressed,
         icon: Icon(icon, size: 14, color: color),
+        tooltip: icon == Icons.edit
+            ? 'Edit'
+            : icon == Icons.copy
+                ? 'Duplicate'
+                : icon == Icons.delete
+                    ? 'Delete'
+                    : null,
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(),
       ),
