@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 import '../../utils/currency_extensions.dart';
 
 import '../../viewmodels/transaction_viewmodel_fixed.dart';
@@ -24,6 +26,13 @@ class ExpensesScreen extends StatefulWidget {
 }
 
 class _ExpensesScreenState extends State<ExpensesScreen> {
+  static const Map<String, List<String>> _quickFilterGroups = {
+    'Essentials': ['Housing', 'Rent', 'Utilities', 'Groceries', 'Food'],
+    'Lifestyle': ['Entertainment', 'Shopping', 'Dining', 'Leisure', 'Travel'],
+    'Subscriptions': ['Subscriptions', 'Streaming', 'Internet', 'TV'],
+    'Transport': ['Transport', 'Transportation', 'Fuel', 'Taxi', 'Ridesharing'],
+  };
+
   int _selectedIndex = 1; // Expenses tab selected
 
   // Initialize to first day of current month to match dropdown item values
@@ -36,6 +45,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   String _selectedCategory = 'All';
   String _sortBy = 'date'; // date, amount, category
   bool _sortAscending = false;
+   String? _selectedQuickFilter;
+   bool _showOnlyThisWeek = false;
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -173,6 +184,38 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
+  Widget _buildQuickFilterChip(String label) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isSelected = _selectedQuickFilter == label;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: isSelected,
+        onSelected: (_) {
+          setState(() {
+            _selectedQuickFilter = isSelected ? null : label;
+            _showOnlyThisWeek = false;
+          });
+        },
+        backgroundColor: colorScheme.surface,
+        selectedColor: colorScheme.primary.withValues(alpha: 0.14),
+        labelStyle: theme.textTheme.labelSmall?.copyWith(
+          color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w500,
+        ),
+        side: BorderSide(
+          color: isSelected
+              ? colorScheme.primary.withValues(alpha: 0.6)
+              : colorScheme.outlineVariant.withValues(alpha: 0.6),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+      ),
+    );
+  }
+
   List<DropdownMenuItem<DateTime>> _buildMonthDropdownItems(TransactionViewModel viewModel) {
     final List<DropdownMenuItem<DateTime>> items = [];
 
@@ -239,9 +282,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               border: Border.all(color: Colors.grey.withValues(alpha: 0.08)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 12,
-                  offset: const Offset(0, 2),
+                  color: colorScheme.shadow.withValues(alpha: 0.06),
+                  blurRadius: 18,
+                  offset: const Offset(0, 10),
                 ),
               ],
             ),
@@ -273,6 +316,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         items: items,
                         onChanged: (DateTime? newValue) {
                           if (newValue != null) {
+                            setState(() {
+                              _selectedQuickFilter = null;
+                              _selectedCategory = 'All';
+                              _showOnlyThisWeek = false;
+                            });
                             _selectedMonthNotifier.value = newValue;
                           }
                         },
@@ -304,9 +352,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.02),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
+                        color: colorScheme.shadow.withValues(alpha: 0.05),
+                        blurRadius: 14,
+                        offset: const Offset(0, 8),
                       ),
                     ],
                   ),
@@ -368,6 +416,21 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 ),
               ),
             ],
+          ),
+          SizedBox(height: isDense ? 6 : 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildQuickFilterChip('Essentials'),
+                  _buildQuickFilterChip('Lifestyle'),
+                  _buildQuickFilterChip('Subscriptions'),
+                  _buildQuickFilterChip('Transport'),
+                ],
+              ),
+            ),
           ),
           if (!isDense) const SizedBox(height: 8),
           Align(
@@ -563,6 +626,23 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     // Apply category filter
     if (_selectedCategory != 'All') {
       expenses = expenses.where((expense) => expense.category == _selectedCategory).toList();
+    }
+
+    if (_selectedQuickFilter != null) {
+      final groupCategories = _quickFilterGroups[_selectedQuickFilter!] ?? const [];
+      if (groupCategories.isNotEmpty) {
+        expenses = expenses
+            .where((expense) => groupCategories.contains(expense.category))
+            .toList();
+      }
+    }
+
+    if (_showOnlyThisWeek) {
+      final today = DateTime.now();
+      expenses = expenses.where((expense) {
+        final diff = today.difference(expense.date).inDays;
+        return diff >= 0 && diff <= 7;
+      }).toList();
     }
 
     // Apply sorting
@@ -799,6 +879,19 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       );
     }
 
+    String? topCategory;
+    double topCategoryShare = 0;
+    if (categoryTotals.isNotEmpty && totalExpenses > 0) {
+      final topEntry = categoryTotals.entries.reduce(
+        (a, b) => a.value >= b.value ? a : b,
+      );
+      topCategory = topEntry.key;
+      topCategoryShare = (topEntry.value / totalExpenses) * 100;
+    }
+
+    final daysInMonth = DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
+    final dailyAverage = totalExpenses / daysInMonth;
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDense = _isDenseLayout(context);
@@ -879,6 +972,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               ],
             ),
             const SizedBox(height: 16),
+            _ExpensesSparkline(
+              expenses: expenses,
+              selectedMonth: selectedMonth,
+            ),
+            const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -909,6 +1007,29 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               ),
               const SizedBox(height: 8),
               _buildCategoryDistribution(categoryTotals),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (topCategory != null)
+                    Text(
+                      'Top: $topCategory (${topCategoryShare.toStringAsFixed(1)}%)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  Text(
+                    'Avg / day: ${dailyAverage.toCurrency()}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[700],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ],
         ),
@@ -949,19 +1070,32 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         final percentage = (entry.value.abs() / categoryTotals.values.fold(0.0, (sum, val) => sum + val.abs())) * 100;
         final categoryColor = CategoryIcons.getColorForCategory(entry.key);
         final categoryIcon = CategoryIcons.getIconForCategory(entry.key);
+        final isSelected = _selectedCategory == entry.key;
         
-        return Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: categoryColor.withAlpha(5),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: categoryColor.withAlpha(10),
-              width: 1,
+        return InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            setState(() {
+              if (_selectedCategory == entry.key) {
+                _selectedCategory = 'All';
+              } else {
+                _selectedCategory = entry.key;
+              }
+              _selectedQuickFilter = null;
+            });
+          },
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isSelected ? categoryColor.withAlpha(20) : categoryColor.withAlpha(5),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected ? categoryColor.withAlpha(80) : categoryColor.withAlpha(10),
+                width: 1,
+              ),
             ),
-          ),
-          child: Row(
+            child: Row(
             children: [
               // Category icon
               Container(
@@ -977,7 +1111,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              // Category name
               Expanded(
                 flex: 2,
                 child: Text(
@@ -990,7 +1123,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              // Progress bar
               Expanded(
                 flex: 3,
                 child: Container(
@@ -1017,7 +1149,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              // Percentage
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -1035,6 +1166,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               ),
             ],
           ),
+          )
         );
       }).toList(),
     );
@@ -1052,6 +1184,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isThisWeekActive = _showOnlyThisWeek;
+    final isCategoriesReset =
+        _selectedCategory == 'All' && _selectedQuickFilter == null && !_showOnlyThisWeek;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -1085,18 +1220,38 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             '$thisWeek',
             Icons.calendar_today,
             Colors.blue,
+            onTap: () {
+              setState(() {
+                _showOnlyThisWeek = !_showOnlyThisWeek;
+              });
+            },
+            isActive: isThisWeekActive,
           ),
           _buildStatItem(
             'Largest',
             largestExpense.amount.abs().toCurrency(),
             Icons.trending_up,
             Colors.red,
+            onTap: () {
+              setState(() {
+                _sortBy = 'amount';
+                _sortAscending = false;
+              });
+            },
           ),
           _buildStatItem(
             'Categories',
             '${expenses.map((e) => e.category).toSet().length}',
             Icons.category,
             Colors.green,
+            onTap: () {
+              setState(() {
+                _selectedCategory = 'All';
+                _selectedQuickFilter = null;
+                _showOnlyThisWeek = false;
+              });
+            },
+            isActive: isCategoriesReset,
           ),
         ],
       ),
@@ -1105,16 +1260,20 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       .slideX(begin: 0.1, end: 0);
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
-    return Column(
+  Widget _buildStatItem(String label, String value, IconData icon, Color color,
+      {VoidCallback? onTap, bool isActive = false}) {
+    final effectiveColor = isActive ? color : color.withAlpha(230);
+    final backgroundColor = isActive ? color.withAlpha(32) : color.withAlpha(10);
+
+    final content = Column(
       children: [
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: color.withAlpha(10),
-            borderRadius: BorderRadius.circular(8),
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: color, size: 20),
+          child: Icon(icon, color: effectiveColor, size: 20),
         ),
         const SizedBox(height: 8),
         Text(
@@ -1122,7 +1281,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: color,
+            color: effectiveColor,
           ),
         ),
         Text(
@@ -1133,6 +1292,19 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           ),
         ),
       ],
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: content,
+      ),
     );
   }
 
@@ -1416,6 +1588,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       child: IconButton(
         onPressed: onPressed,
         icon: Icon(icon, size: 14, color: color),
+        tooltip: icon == Icons.edit
+            ? 'Edit'
+            : icon == Icons.copy
+                ? 'Duplicate'
+                : icon == Icons.delete
+                    ? 'Delete'
+                    : null,
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(),
       ),
@@ -1504,5 +1683,266 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       return AppTheme.categoryColors[category]!;
     }
     return AppTheme.categoryColors['Other']!;
+  }
+}
+
+class _ExpensesSparkline extends StatefulWidget {
+  final List<Transaction> expenses;
+  final DateTime selectedMonth;
+
+  const _ExpensesSparkline({
+    required this.expenses,
+    required this.selectedMonth,
+  });
+
+  @override
+  State<_ExpensesSparkline> createState() => _ExpensesSparklineState();
+}
+
+class _ExpensesSparklineState extends State<_ExpensesSparkline> {
+  int? _hoveredIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    final expenses = widget.expenses;
+    if (expenses.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final selectedMonth = widget.selectedMonth;
+    final daysInMonth = DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
+    final dailyTotals = List<double>.filled(daysInMonth, 0);
+
+    for (final tx in expenses) {
+      if (tx.date.year == selectedMonth.year && tx.date.month == selectedMonth.month) {
+        final dayIndex = tx.date.day - 1;
+        if (dayIndex >= 0 && dayIndex < daysInMonth) {
+          dailyTotals[dayIndex] += tx.amount.abs();
+        }
+      }
+    }
+
+    final maxValue = dailyTotals.fold<double>(0, (prev, v) => math.max(prev, v));
+    if (maxValue <= 0) {
+      // Flat line when all values are zero
+      return const SizedBox(height: 40);
+    }
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    const double sparklineHeight = 56.0;
+
+    return SizedBox(
+      height: sparklineHeight,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              colorScheme.surface.withValues(alpha: 0.9),
+              colorScheme.surfaceContainerHighest.withValues(alpha: 0.9),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              return MouseRegion(
+                onHover: (event) {
+                  if (width <= 0 || dailyTotals.isEmpty) return;
+                  final dxStep = dailyTotals.length == 1
+                      ? width
+                      : width / (dailyTotals.length - 1);
+                  if (dxStep <= 0) return;
+                  final rawIndex = event.localPosition.dx / dxStep;
+                  final index = rawIndex.round().clamp(0, dailyTotals.length - 1);
+                  if (_hoveredIndex != index) {
+                    setState(() => _hoveredIndex = index);
+                  }
+                },
+                onExit: (_) {
+                  if (_hoveredIndex != null) {
+                    setState(() => _hoveredIndex = null);
+                  }
+                },
+                child: CustomPaint(
+                  painter: _ExpensesSparklinePainter(
+                    dailyTotals: dailyTotals,
+                    maxValue: maxValue,
+                    lineColor: colorScheme.error,
+                    hoveredIndex: kIsWeb ? _hoveredIndex : null,
+                    firstDayOfMonth: DateTime(
+                      selectedMonth.year,
+                      selectedMonth.month,
+                      1,
+                    ),
+                  ),
+                  child: const SizedBox.expand(),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ExpensesSparklinePainter extends CustomPainter {
+  final List<double> dailyTotals;
+  final double maxValue;
+  final Color lineColor;
+  final int? hoveredIndex;
+  final DateTime firstDayOfMonth;
+
+  _ExpensesSparklinePainter({
+    required this.dailyTotals,
+    required this.maxValue,
+    required this.lineColor,
+    required this.hoveredIndex,
+    required this.firstDayOfMonth,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (dailyTotals.isEmpty || maxValue <= 0) return;
+
+    final path = Path();
+    final fillPath = Path();
+    final points = <Offset>[];
+
+    final dxStep = dailyTotals.length == 1
+        ? 0.0
+        : size.width / (dailyTotals.length - 1);
+
+    double normalize(double v) => v / maxValue;
+
+    for (int i = 0; i < dailyTotals.length; i++) {
+      final x = dxStep * i;
+      final value = normalize(dailyTotals[i]);
+      final y = size.height - (value * size.height * 0.8);
+
+      final point = Offset(x, y);
+      points.add(point);
+
+      if (i == 0) {
+        path.moveTo(point.dx, point.dy);
+        fillPath.moveTo(point.dx, size.height);
+        fillPath.lineTo(point.dx, point.dy);
+      } else {
+        path.lineTo(point.dx, point.dy);
+        fillPath.lineTo(point.dx, point.dy);
+      }
+    }
+
+    fillPath.lineTo(size.width, size.height);
+    fillPath.close();
+
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          lineColor.withValues(alpha: 0.18),
+          lineColor.withValues(alpha: 0.01),
+        ],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ).createShader(Offset.zero & size);
+
+    final linePaint = Paint()
+      ..color = lineColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawPath(fillPath, fillPaint);
+    canvas.drawPath(path, linePaint);
+
+    if (hoveredIndex != null &&
+        hoveredIndex! >= 0 &&
+        hoveredIndex! < points.length) {
+      final index = hoveredIndex!;
+      final hoverPoint = points[index];
+      final hoverAmount = dailyTotals[index];
+      final hoverDate = firstDayOfMonth.add(Duration(days: index));
+
+      // Marker circle
+      final markerPaint = Paint()
+        ..color = lineColor
+        ..style = PaintingStyle.fill;
+      final markerStrokePaint = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0;
+      canvas.drawCircle(hoverPoint, 3.5, markerPaint);
+      canvas.drawCircle(hoverPoint, 3.5, markerStrokePaint);
+
+      // Tooltip label
+      final label = '${DateFormat.MMMd().format(hoverDate)} • ${hoverAmount.toCurrency()}';
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        maxLines: 1,
+        textDirection: ui.TextDirection.ltr,
+      )..layout();
+
+      const double padding = 6.0;
+      final tooltipWidth = textPainter.width + padding * 2;
+      final tooltipHeight = textPainter.height + padding * 2;
+
+      double tooltipX = hoverPoint.dx - tooltipWidth / 2;
+      double tooltipY = hoverPoint.dy - tooltipHeight - 8;
+
+      // Keep tooltip within bounds
+      if (tooltipX < 4) tooltipX = 4;
+      if (tooltipX + tooltipWidth > size.width - 4) {
+        tooltipX = size.width - tooltipWidth - 4;
+      }
+      if (tooltipY < 4) {
+        tooltipY = hoverPoint.dy + 8;
+      }
+
+      final tooltipRect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(tooltipX, tooltipY, tooltipWidth, tooltipHeight),
+        const Radius.circular(6),
+      );
+
+      final tooltipPaint = Paint()
+        ..color = Colors.black.withValues(alpha: 0.78);
+
+      canvas.drawRRect(tooltipRect, tooltipPaint);
+      textPainter.paint(
+        canvas,
+        Offset(tooltipRect.left + padding, tooltipRect.top + padding),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ExpensesSparklinePainter oldDelegate) {
+    if (oldDelegate.maxValue != maxValue ||
+        oldDelegate.lineColor != lineColor ||
+        oldDelegate.hoveredIndex != hoveredIndex ||
+        oldDelegate.firstDayOfMonth != firstDayOfMonth) {
+      return true;
+    }
+    if (oldDelegate.dailyTotals.length != dailyTotals.length) {
+      return true;
+    }
+    for (int i = 0; i < dailyTotals.length; i++) {
+      if (oldDelegate.dailyTotals[i] != dailyTotals[i]) {
+        return true;
+      }
+    }
+    return false;
   }
 }
