@@ -318,118 +318,130 @@ class _CategoryDetailsScreenState extends State<CategoryDetailsScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Category summary card
-                  Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                _getCategoryIcon(widget.category),
-                                size: 32,
-                                color: AppTheme.primaryColor,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                widget.category,
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const Divider(height: 24),
-                          _summaryRow('Total Spent', currencyFormat.format(_totalAmount)),
-                          _summaryRow('Average Transaction', currencyFormat.format(_averageAmount)),
-                          _summaryRow('Largest Transaction', currencyFormat.format(_maxAmount)),
-                          _summaryRow(
-                            'Last Transaction', 
-                            _lastTransactionDate != null
-                                ? DateFormat('MMMM d, yyyy').format(_lastTransactionDate!)
-                                : 'N/A'
-                          ),
-                        ],
+          : CustomScrollView(
+              slivers: [
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: 16),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  sliver: SliverToBoxAdapter(
+                    child: Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                    ),
-                  ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.2, end: 0),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Transactions list
-                  const Text(
-                    'Transactions',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ).animate().fadeIn(duration: 400.ms, delay: 100.ms),
-                  
-                  const SizedBox(height: 16),
-                  
-                  _transactions.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32.0),
-                            child: Column(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                const Icon(
-                                  Icons.receipt_long,
-                                  size: 64,
-                                  color: Colors.grey,
+                                Icon(
+                                  _getCategoryIcon(widget.category),
+                                  size: 32,
+                                  color: AppTheme.primaryColor,
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(width: 12),
                                 Text(
-                                  'No ${widget.category} transactions found',
+                                  widget.category,
                                   style: const TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                  textAlign: TextAlign.center,
                                 ),
                               ],
                             ),
-                          ),
-                        )
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _transactions.length,
-                          itemBuilder: (context, index) {
-                            final transaction = _transactions[index];
-                            
-                            // Format amount with currency symbol
-                            final amountText = transaction.amount < 0
-                                ? currencyFormat.format(transaction.amount)
-                                : '+${currencyFormat.format(transaction.amount)}';
-                            
-                            // Format date
-                            final dateText = DateFormat('MMM d, yyyy').format(transaction.date);
-                            
-                            return AnimatedTransactionItem(
-                              title: transaction.title,
-                              subtitle: transaction.category,
-                              amount: amountText,
-                              date: dateText,
-                              icon: _getCategoryIcon(widget.category),
-                              onTap: () => _showTransactionDetails(transaction: transaction),
-                            ).animate().fadeIn(duration: 300.ms, delay: 100.ms * index);
-                          },
+                            const Divider(height: 24),
+                            _summaryRow('Total Spent', currencyFormat.format(_totalAmount)),
+                            _summaryRow('Average Transaction', currencyFormat.format(_averageAmount)),
+                            _summaryRow('Largest Transaction', currencyFormat.format(_maxAmount)),
+                            _summaryRow(
+                              'Last Transaction',
+                              _lastTransactionDate != null
+                                  ? DateFormat('MMMM d, yyyy').format(_lastTransactionDate!)
+                                  : 'N/A',
+                            ),
+                          ],
                         ),
-                ],
-              ),
+                      ),
+                    ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.2, end: 0),
+                  ),
+                ),
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: 24),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  sliver: SliverToBoxAdapter(
+                    child: const Text(
+                      'Transactions',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ).animate().fadeIn(duration: 400.ms, delay: 100.ms),
+                  ),
+                ),
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: 16),
+                ),
+                if (_transactions.isEmpty)
+                  SliverPadding(
+                    padding: const EdgeInsets.all(32.0),
+                    sliver: SliverToBoxAdapter(
+                      child: Center(
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.receipt_long,
+                              size: 64,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No ${widget.category} transactions found',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    sliver: SliverList.builder(
+                      itemCount: _transactions.length,
+                      itemBuilder: (context, index) {
+                        final transaction = _transactions[index];
+
+                        final amountText = transaction.amount < 0
+                            ? currencyFormat.format(transaction.amount)
+                            : '+${currencyFormat.format(transaction.amount)}';
+
+                        final dateText = DateFormat('MMM d, yyyy').format(transaction.date);
+
+                        return AnimatedTransactionItem(
+                          title: transaction.title,
+                          subtitle: transaction.category,
+                          amount: amountText,
+                          date: dateText,
+                          icon: _getCategoryIcon(widget.category),
+                          onTap: () => _showTransactionDetails(transaction: transaction),
+                        ).animate().fadeIn(duration: 300.ms, delay: 100.ms * index);
+                      },
+                    ),
+                  ),
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: 24),
+                ),
+              ],
             ),
       floatingActionButton: AnimatedButtons.floatingActionButton(
         onPressed: () async {
