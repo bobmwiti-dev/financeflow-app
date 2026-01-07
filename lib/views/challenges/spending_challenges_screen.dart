@@ -66,18 +66,18 @@ class _SpendingChallengesScreenState extends State<SpendingChallengesScreen> wit
           return CustomScrollView(
             slivers: [
               _buildEnhancedAppBar(),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+              SliverPadding(
+                padding: const EdgeInsets.all(16.0),
+                sliver: SliverToBoxAdapter(
                   child: Column(
                     children: [
                       _buildSummaryCard(challengeViewModel),
                       const SizedBox(height: 20),
-                      _buildChallengesList(challengeViewModel),
                     ],
                   ),
                 ),
               ),
+              ..._buildChallengesSlivers(challengeViewModel),
             ],
           );
         },
@@ -203,15 +203,50 @@ class _SpendingChallengesScreenState extends State<SpendingChallengesScreen> wit
       return _buildEmptyState();
     }
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: challenges.length,
-      itemBuilder: (context, index) {
-        final challenge = challenges[index];
-        return _buildEnhancedChallengeCard(challenge, index);
-      },
+    final estimatedHeight = (challenges.length * 150.0).clamp(200.0, 900.0);
+
+    return SizedBox(
+      height: estimatedHeight,
+      child: ListView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: challenges.length,
+        itemBuilder: (context, index) {
+          final challenge = challenges[index];
+          return _buildEnhancedChallengeCard(challenge, index);
+        },
+      ),
     );
+  }
+
+  List<Widget> _buildChallengesSlivers(ChallengeViewModel challengeViewModel) {
+    final challenges = challengeViewModel.challenges;
+
+    if (challenges.isEmpty) {
+      return [
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          sliver: SliverToBoxAdapter(
+            child: _buildEmptyState(),
+          ),
+        ),
+      ];
+    }
+
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        sliver: SliverList.builder(
+          itemCount: challenges.length,
+          itemBuilder: (context, index) {
+            final challenge = challenges[index];
+            return _buildEnhancedChallengeCard(challenge, index);
+          },
+        ),
+      ),
+      const SliverToBoxAdapter(
+        child: SizedBox(height: 16),
+      ),
+    ];
   }
 
   Widget _buildEnhancedChallengeCard(SpendingChallenge challenge, int index) {
