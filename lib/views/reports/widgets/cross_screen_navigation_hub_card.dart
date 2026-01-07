@@ -380,20 +380,25 @@ class _CrossScreenNavigationHubCardState extends State<CrossScreenNavigationHubC
       );
     }
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 1.2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+    final rowCount = (filteredShortcuts.length / 2).ceil();
+    final gridHeight = (rowCount * 150.0 + ((rowCount - 1) * 12.0)).clamp(150.0, 520.0);
+
+    return SizedBox(
+      height: gridHeight,
+      child: GridView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 1.2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+        ),
+        itemCount: filteredShortcuts.length,
+        itemBuilder: (context, index) {
+          final shortcut = filteredShortcuts[index];
+          return _buildNavigationTile(shortcut, index);
+        },
       ),
-      itemCount: filteredShortcuts.length,
-      itemBuilder: (context, index) {
-        final shortcut = filteredShortcuts[index];
-        return _buildNavigationTile(shortcut, index);
-      },
     );
   }
 
