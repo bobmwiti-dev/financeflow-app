@@ -37,13 +37,12 @@ class _UpcomingEventsScreenState extends State<UpcomingEventsScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _events.isEmpty
               ? const Center(child: Text('No upcoming events found.'))
-              : SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      children: [
-                        // Interactive timeline (14-day window starting today)
-                        InteractiveCashFlowTimeline(
+              : CustomScrollView(
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.all(16.0),
+                      sliver: SliverToBoxAdapter(
+                        child: InteractiveCashFlowTimeline(
                           events: _events
                               .map((e) => CashFlowEvent(
                                     id: '',
@@ -66,9 +65,12 @@ class _UpcomingEventsScreenState extends State<UpcomingEventsScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text('Date: ${DateFormat.yMMMEd().format(ev.date)}'),
-                                    Text('Amount: \$${ev.amount.toStringAsFixed(2)}',
-                                        style: TextStyle(
-                                            color: ev.isIncome ? Colors.green : Colors.red)),
+                                    Text(
+                                      'Amount: \$${ev.amount.toStringAsFixed(2)}',
+                                      style: TextStyle(
+                                        color: ev.isIncome ? Colors.green : Colors.red,
+                                      ),
+                                    ),
                                     if (ev.isRecurring) const Text('Recurring'),
                                   ],
                                 ),
@@ -82,35 +84,40 @@ class _UpcomingEventsScreenState extends State<UpcomingEventsScreen> {
                             );
                           },
                         ),
-                        const SizedBox(height: 24),
-                        // Simple list of all events sorted
-                        ListView.separated(
-                          physics: const NeverScrollableScrollPhysics(),
-                          shrinkWrap: true,
-                          itemCount: _events.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (context, index) {
-                            final e = _events[index];
-                            final dateStr = DateFormat.yMMMd().format(e.date);
-                            final amountStr = (e.isIncome ? '+' : '-') + e.amount.toStringAsFixed(2);
-                            final amountColor = e.isIncome ? Colors.green : Colors.red;
-                            return ListTile(
-                              leading: Icon(
-                                e.isIncome ? Icons.arrow_downward : Icons.arrow_upward,
-                                color: amountColor,
-                              ),
-                              title: Text(e.title),
-                              subtitle: Text(dateStr),
-                              trailing: Text(
-                                '\$$amountStr',
-                                style: TextStyle(color: amountColor, fontWeight: FontWeight.bold),
-                              ),
-                            );
-                          },
-                        )
-                      ],
+                      ),
                     ),
-                  ),
+                    const SliverToBoxAdapter(
+                      child: SizedBox(height: 8),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      sliver: SliverList.separated(
+                        itemCount: _events.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final e = _events[index];
+                          final dateStr = DateFormat.yMMMd().format(e.date);
+                          final amountStr = (e.isIncome ? '+' : '-') + e.amount.toStringAsFixed(2);
+                          final amountColor = e.isIncome ? Colors.green : Colors.red;
+                          return ListTile(
+                            leading: Icon(
+                              e.isIncome ? Icons.arrow_downward : Icons.arrow_upward,
+                              color: amountColor,
+                            ),
+                            title: Text(e.title),
+                            subtitle: Text(dateStr),
+                            trailing: Text(
+                              '\$$amountStr',
+                              style: TextStyle(color: amountColor, fontWeight: FontWeight.bold),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SliverToBoxAdapter(
+                      child: SizedBox(height: 16),
+                    ),
+                  ],
                 ),
     );
   }
