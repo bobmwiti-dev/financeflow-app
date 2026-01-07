@@ -848,16 +848,17 @@ class _SpendingHeatmapScreenState extends State<SpendingHeatmapScreen>
             ),
           ),
           const SizedBox(height: 8),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: spendingData.transactions.length,
-            itemBuilder: (context, index) {
-              final transaction = spendingData.transactions[index];
-              return _buildTransactionItem(transaction).animate()
-                .fadeIn(duration: const Duration(milliseconds: 300), delay: Duration(milliseconds: 50 * index))
-                .slideX(begin: 0.2, end: 0);
-            },
+          SizedBox(
+            height: (spendingData.transactions.length * 72.0).clamp(120.0, 320.0),
+            child: ListView.builder(
+              itemCount: spendingData.transactions.length,
+              itemBuilder: (context, index) {
+                final transaction = spendingData.transactions[index];
+                return _buildTransactionItem(transaction).animate()
+                  .fadeIn(duration: const Duration(milliseconds: 300), delay: Duration(milliseconds: 50 * index))
+                  .slideX(begin: 0.2, end: 0);
+              },
+            ),
           ),
         ],
       ),
