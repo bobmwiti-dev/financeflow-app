@@ -59,21 +59,32 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
               ),
             ],
           ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-            child: Column(
-              children: [
-                SizedBox(height: kToolbarHeight + MediaQuery.of(context).padding.top),
-                _buildHeader(context, latestGoal),
-                const SizedBox(height: 24),
-                _buildInfoCard(context, latestGoal),
-                const SizedBox(height: 16),
-                if (latestGoal.targetMonthlyContribution != null && latestGoal.targetMonthlyContribution! > 0)
-                  _buildMonthlyPlanCard(context, latestGoal),
-                const SizedBox(height: 16),
-                _buildContributionHistory(context, latestGoal),
-              ],
-            ),
+          body: CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    children: [
+                      SizedBox(height: kToolbarHeight + MediaQuery.of(context).padding.top),
+                      _buildHeader(context, latestGoal),
+                      const SizedBox(height: 24),
+                      _buildInfoCard(context, latestGoal),
+                      const SizedBox(height: 16),
+                      if (latestGoal.targetMonthlyContribution != null &&
+                          latestGoal.targetMonthlyContribution! > 0)
+                        _buildMonthlyPlanCard(context, latestGoal),
+                      const SizedBox(height: 16),
+                      _buildContributionHistoryHeader(context, latestGoal),
+                    ],
+                  ),
+                ),
+              ),
+              ..._buildContributionHistorySlivers(context, latestGoal),
+              const SliverToBoxAdapter(
+                child: SizedBox(height: 24),
+              ),
+            ],
           ),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () => _showAddFundsDialog(context, latestGoal),
@@ -217,24 +228,89 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                 ),
               )
             else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: contributions.length,
-                itemBuilder: (context, index) {
-                  final contribution = contributions[index];
-                  return ListTile(
-                    leading: const Icon(Icons.arrow_upward, color: AppTheme.successColor),
-                    title: Text('+ ${contribution.amount.toCurrency()}'),
-                    trailing: Text(dateFormat.format(contribution.date)),
-                  );
-                },
-                separatorBuilder: (context, index) => const Divider(height: 1),
+              SizedBox(
+                height: (contributions.length * 56.0).clamp(120.0, 360.0),
+                child: ListView.separated(
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: contributions.length,
+                  itemBuilder: (context, index) {
+                    final contribution = contributions[index];
+                    return ListTile(
+                      leading: const Icon(Icons.arrow_upward, color: AppTheme.successColor),
+                      title: Text('+ ${contribution.amount.toCurrency()}'),
+                      trailing: Text(dateFormat.format(contribution.date)),
+                    );
+                  },
+                  separatorBuilder: (context, index) => const Divider(height: 1),
+                ),
               ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildContributionHistoryHeader(BuildContext context, Goal currentGoal) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Contribution History', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildContributionHistorySlivers(BuildContext context, Goal currentGoal) {
+    final viewModel = context.watch<GoalViewModel>();
+    final contributions = viewModel.contributions;
+    final locale = Localizations.localeOf(context).toString();
+    final dateFormat = DateFormat('MMM dd, yyyy', locale);
+
+    if (contributions.isEmpty) {
+      return [
+        const SliverPadding(
+          padding: EdgeInsets.symmetric(horizontal: 16.0),
+          sliver: SliverToBoxAdapter(
+            child: Card(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Center(
+                  child: Text(
+                    'No contributions recorded yet.',
+                    style: TextStyle(color: AppTheme.secondaryTextColor),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ];
+    }
+
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        sliver: SliverList.separated(
+          itemCount: contributions.length,
+          itemBuilder: (context, index) {
+            final contribution = contributions[index];
+            return Card(
+              child: ListTile(
+                leading: const Icon(Icons.arrow_upward, color: AppTheme.successColor),
+                title: Text('+ ${contribution.amount.toCurrency()}'),
+                trailing: Text(dateFormat.format(contribution.date)),
+              ),
+            );
+          },
+          separatorBuilder: (context, index) => const SizedBox(height: 0),
+        ),
+      ),
+    ];
   }
 
     void _showAddFundsDialog(BuildContext context, Goal currentGoal) {
