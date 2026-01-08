@@ -34,6 +34,40 @@ class _LoansScreenState extends State<LoansScreen> {
   bool _isLoading = false;
   String _selectedFilter = 'All';
 
+  LinearGradient get _accentGradient => const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color(0xFF6366F1),
+          Color(0xFF8B5CF6),
+        ],
+      );
+
+  BoxDecoration _premiumCardDecoration(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          colorScheme.surface,
+          colorScheme.surfaceContainerHighest,
+        ],
+      ),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(
+        color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: colorScheme.shadow.withValues(alpha: 0.08),
+          blurRadius: 28,
+          offset: const Offset(0, 16),
+        ),
+      ],
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -76,24 +110,17 @@ class _LoansScreenState extends State<LoansScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final loanViewModel = Provider.of<LoanViewModel>(context);
     
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
         flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF10B981), // Emerald green
-                Color(0xFF059669), // Darker emerald
-              ],
-            ),
-          ),
+          decoration: BoxDecoration(gradient: _accentGradient),
         ),
         title: ShaderMask(
           shaderCallback: (bounds) => const LinearGradient(
@@ -112,8 +139,11 @@ class _LoansScreenState extends State<LoansScreen> {
           Container(
             margin: const EdgeInsets.only(right: 8),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
+              color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.2),
+              ),
             ),
             child: PopupMenuButton<String>(
               onSelected: (value) {
@@ -146,31 +176,36 @@ class _LoansScreenState extends State<LoansScreen> {
         selectedIndex: _selectedIndex,
         onItemSelected: _onItemSelected,
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadLoans,
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _buildContent(loanViewModel),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              colorScheme.surface,
+              colorScheme.surfaceContainerHighest,
+            ],
+          ),
+        ),
+        child: RefreshIndicator(
+          onRefresh: _loadLoans,
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _buildContent(loanViewModel),
+        ),
       ),
       floatingActionButton: Container(
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF10B981), // Emerald green
-              Color(0xFF059669), // Darker emerald
-            ],
-          ),
+          gradient: _accentGradient,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF10B981).withValues(alpha: 0.3),
+              color: const Color(0xFF6366F1).withValues(alpha: 0.28),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
             BoxShadow(
-              color: const Color(0xFF059669).withValues(alpha: 0.2),
+              color: const Color(0xFF8B5CF6).withValues(alpha: 0.18),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -252,9 +287,7 @@ class _LoansScreenState extends State<LoansScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             ShaderMask(
-              shaderCallback: (bounds) => const LinearGradient(
-                colors: [Color(0xFF10B981), Color(0xFF059669)],
-              ).createShader(bounds),
+              shaderCallback: (bounds) => _accentGradient.createShader(bounds),
               child: Text(
                 _selectedFilter == 'All' ? 'All Loans' : '$_selectedFilter Loans',
                 style: const TextStyle(
@@ -268,9 +301,7 @@ class _LoansScreenState extends State<LoansScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF10B981), Color(0xFF059669)],
-                ),
+                gradient: _accentGradient,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -310,13 +341,31 @@ class _LoansScreenState extends State<LoansScreen> {
 
   Widget _buildAddedLoanCard() {
     // Using toKenyaDualCurrency() for Kenya loan market
+    final theme = Theme.of(context);
     final l = _recentlyAddedLoan!;
-    return Card(
-      color: Colors.green.shade50,
+    return Container(
+      decoration: _premiumCardDecoration(theme),
       child: ListTile(
-        leading: const Icon(Icons.check_circle, color: Colors.green),
-        title: Text(l.name),
-        subtitle: Text('Amount: ${l.totalAmount.toKenyaDualCurrency()}'),
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            gradient: _accentGradient,
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.check, color: Colors.white),
+        ),
+        title: Text(
+          l.name,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        subtitle: Text(
+          'Amount: ${l.totalAmount.toKenyaDualCurrency()}',
+          style: TextStyle(color: Colors.grey.shade700),
+        ),
         trailing: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => setState(() => _recentlyAddedLoan = null),
@@ -326,40 +375,19 @@ class _LoansScreenState extends State<LoansScreen> {
   }
 
   Widget _buildEmptyState() {
+    final theme = Theme.of(context);
     return Center(
       child: Container(
         margin: const EdgeInsets.all(24),
         padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 20,
-              offset: const Offset(0, 4),
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 40,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
+        decoration: _premiumCardDecoration(theme),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF10B981),
-                    Color(0xFF059669),
-                  ],
-                ),
+                gradient: _accentGradient,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const FaIcon(
@@ -370,9 +398,7 @@ class _LoansScreenState extends State<LoansScreen> {
             ),
             const SizedBox(height: 24),
             ShaderMask(
-              shaderCallback: (bounds) => const LinearGradient(
-                colors: [Color(0xFF10B981), Color(0xFF059669)],
-              ).createShader(bounds),
+              shaderCallback: (bounds) => _accentGradient.createShader(bounds),
               child: Text(
                 _selectedFilter == 'All' 
                     ? 'No loans added yet' 
@@ -398,18 +424,11 @@ class _LoansScreenState extends State<LoansScreen> {
             const SizedBox(height: 32),
             Container(
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF10B981),
-                    Color(0xFF059669),
-                  ],
-                ),
+                gradient: _accentGradient,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                    color: const Color(0xFF6366F1).withValues(alpha: 0.28),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -471,23 +490,16 @@ class _LoansScreenState extends State<LoansScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF10B981),
-            Color(0xFF059669),
-          ],
-        ),
+        gradient: _accentGradient,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF10B981).withValues(alpha: 0.3),
+            color: const Color(0xFF6366F1).withValues(alpha: 0.28),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
           BoxShadow(
-            color: const Color(0xFF059669).withValues(alpha: 0.2),
+            color: const Color(0xFF8B5CF6).withValues(alpha: 0.18),
             blurRadius: 30,
             offset: const Offset(0, 12),
           ),
@@ -709,12 +721,13 @@ class _LoansScreenState extends State<LoansScreen> {
 
   Widget _buildLoanCard(Loan loan) {
     // Using toKenyaDualCurrency() for Kenya loan market
+    final theme = Theme.of(context);
     final dateFormat = DateFormat(AppConstants.dateFormat);
     
     Color statusColor;
     switch (loan.status) {
       case 'Active':
-        statusColor = loan.isOverdue ? AppTheme.errorColor : Colors.blue;
+        statusColor = loan.isOverdue ? AppTheme.errorColor : const Color(0xFF6366F1);
         break;
       case 'Paid':
         statusColor = AppTheme.successColor;
@@ -726,8 +739,9 @@ class _LoansScreenState extends State<LoansScreen> {
         statusColor = Colors.grey;
     }
     
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 16),
+      decoration: _premiumCardDecoration(theme),
       child: InkWell(
         onTap: () async {
           final result = await Navigator.push(
@@ -742,7 +756,7 @@ class _LoansScreenState extends State<LoansScreen> {
             _loadLoans();
           }
         },
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(24),
         child: Column(
           children: [
             Container(
@@ -750,8 +764,8 @@ class _LoansScreenState extends State<LoansScreen> {
               decoration: BoxDecoration(
                 color: statusColor.withAlpha((0.1 * 255).toInt()),
                 borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(8),
-                  topRight: Radius.circular(8),
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
                 ),
               ),
               child: Row(
@@ -799,7 +813,7 @@ class _LoansScreenState extends State<LoansScreen> {
                       icon: const Icon(Icons.payment, size: 16),
                       label: const Text('Make Payment'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryColor,
+                        backgroundColor: const Color(0xFF6366F1),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
                         minimumSize: const Size(0, 32),
@@ -846,7 +860,7 @@ class _LoansScreenState extends State<LoansScreen> {
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: AppTheme.primaryColor,
+                              color: Color(0xFF6366F1),
                             ),
                           ),
                           const SizedBox(height: 4),

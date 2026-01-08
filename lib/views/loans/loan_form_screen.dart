@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:logging/logging.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../viewmodels/loan_viewmodel.dart';
 import '../../models/loan_model.dart';
-import '../../themes/app_theme.dart';
 import '../../constants/app_constants.dart';
 
 class LoanFormScreen extends StatefulWidget {
@@ -36,6 +36,40 @@ class _LoanFormScreenState extends State<LoanFormScreen> {
   DateTime _startDate = DateTime.now();
   DateTime _dueDate = DateTime.now().add(const Duration(days: 365)); // Default to 1 year
   bool _isLoading = false;
+
+  LinearGradient get _accentGradient => const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color(0xFF6366F1),
+          Color(0xFF8B5CF6),
+        ],
+      );
+
+  BoxDecoration _premiumCardDecoration(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          colorScheme.surface,
+          colorScheme.surfaceContainerHighest,
+        ],
+      ),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(
+        color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: colorScheme.shadow.withValues(alpha: 0.08),
+          blurRadius: 28,
+          offset: const Offset(0, 16),
+        ),
+      ],
+    );
+  }
 
   @override
   void initState() {
@@ -209,80 +243,119 @@ class _LoanFormScreenState extends State<LoanFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final isEditing = widget.loan != null;
     final title = isEditing ? 'Edit Loan' : 'Add Loan';
     
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: Text(title),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(gradient: _accentGradient),
+        ),
+        title: ShaderMask(
+          shaderCallback: (bounds) => const LinearGradient(
+            colors: [Colors.white, Colors.white70],
+          ).createShader(bounds),
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ),
         actions: [
           if (isEditing)
             IconButton(
               icon: const Icon(Icons.delete),
+              color: Colors.white,
               onPressed: () {
                 _showDeleteConfirmationDialog();
               },
             ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildNameField(),
-                    const SizedBox(height: 16),
-                    _buildLenderField(),
-                    const SizedBox(height: 16),
-                    Row(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              colorScheme.surface,
+              colorScheme.surfaceContainerHighest,
+            ],
+          ),
+        ),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Container(
+                  decoration: _premiumCardDecoration(theme),
+                  padding: const EdgeInsets.all(20),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: _buildTotalAmountField(),
+                        _buildNameField(),
+                        const SizedBox(height: 16),
+                        _buildLenderField(),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTotalAmountField(),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildInterestRateField(),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildInterestRateField(),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildAmountPaidField(),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildInstallmentAmountField(),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 16),
+                        _buildDateRangePicker(),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildStatusDropdown(),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildFrequencyDropdown(),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _buildNotesField(),
+                        const SizedBox(height: 24),
+                        _buildSaveButton(),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildAmountPaidField(),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildInstallmentAmountField(),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _buildDateRangePicker(),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildStatusDropdown(),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildFrequencyDropdown(),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _buildNotesField(),
-                    const SizedBox(height: 24),
-                    _buildSaveButton(),
-                  ],
-                ),
+                  ),
+                ).animate()
+                  .fadeIn(duration: 400.ms)
+                  .slideY(begin: 0.05, end: 0, duration: 400.ms, curve: Curves.easeOut),
               ),
-            ),
+      ),
     );
   }
 
@@ -568,20 +641,42 @@ class _LoanFormScreenState extends State<LoanFormScreen> {
   }
 
   Widget _buildSaveButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton(
-        onPressed: _saveLoan,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.primaryColor,
-          foregroundColor: Colors.white,
-        ),
-        child: Text(
-          widget.loan != null ? 'Update Loan' : 'Add Loan',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+    return Container(
+      decoration: BoxDecoration(
+        gradient: _accentGradient,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6366F1).withValues(alpha: 0.28),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: const Color(0xFF8B5CF6).withValues(alpha: 0.18),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: _saveLoan,
+          child: SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: Center(
+              child: Text(
+                widget.loan != null ? 'Update Loan' : 'Add Loan',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ),
           ),
         ),
       ),
