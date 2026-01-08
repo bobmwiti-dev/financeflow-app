@@ -21,7 +21,10 @@ class BudgetViewModel extends ChangeNotifier {
   bool _isLoading = false;
   bool _useFirestore = false; // Flag to determine if we should use Firestore or SQLite
   StreamSubscription<List<Budget>>? _budgetSubscription;
+  StreamSubscription<List<app_models.Transaction>>? _transactionsSubscription;
   DateTime _selectedMonth = DateTime.now(); // Current selected month
+  Map<String, double> _spentByCategory = {};
+  List<app_models.Transaction> _latestTransactions = [];
   final Logger logger = Logger('BudgetViewModel');
 
   List<Budget> get budgets => _budgets;
@@ -51,10 +54,48 @@ class BudgetViewModel extends ChangeNotifier {
     if (_useFirestore) {
       // Subscribe to real-time updates if using Firestore
       _subscribeToBudgets();
+      _subscribeToTransactions();
     } else {
       // Load from SQLite if not using Firestore (mobile only)
       loadBudgets();
     }
+  }
+
+  void _subscribeToTransactions() {
+    logger.info('Subscribing to transaction updates for budget spent computation');
+
+    _transactionsSubscription?.cancel();
+    _realtimeDataService.startTransactionsStream();
+
+    _transactionsSubscription = _realtimeDataService.transactionsStream.listen(
+      (transactions) {
+        _latestTransactions = transactions;
+        _recomputeSpentByCategoryFromTransactions(transactions);
+        if (_allBudgets.isNotEmpty) {
+          _filterBudgetsByMonth();
+        }
+      },
+      onError: (error) {
+        logger.severe('Error in transactions stream for budgets: $error');
+      },
+    );
+  }
+
+  void _recomputeSpentByCategoryFromTransactions(List<app_models.Transaction> transactions) {
+    final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+    final startOfNextMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
+
+    final Map<String, double> spent = {};
+
+    for (final tx in transactions) {
+      if (tx.type != app_models.TransactionType.expense) continue;
+      if (tx.date.isBefore(startOfMonth) || !tx.date.isBefore(startOfNextMonth)) continue;
+
+      final category = tx.category;
+      spent[category] = (spent[category] ?? 0.0) + tx.amount.abs();
+    }
+
+    _spentByCategory = spent;
   }
   
   /// Subscribe to real-time budget updates from Firestore
@@ -110,14 +151,18 @@ class BudgetViewModel extends ChangeNotifier {
 
       try {
         final budgets = await _databaseService.getBudgets();
+        final Map<String, double> spent = {};
         for (var i = 0; i < budgets.length; i++) {
           final budget = budgets[i];
           final transactions = await _databaseService.getTransactionsByMonth(budget.startDate);
-          final spent = transactions
+          final spentForCategory = transactions
               .where((t) => t.category == budget.category)
               .fold(0.0, (sum, t) => sum + t.amount.abs());
-          budgets[i] = budget.copyWith(spent: spent);
+
+          spent[budget.category] = (spent[budget.category] ?? 0.0) + spentForCategory;
+          budgets[i] = budget.copyWith(spent: spentForCategory);
         }
+        _spentByCategory = spent;
         _allBudgets = budgets;
         _filterBudgetsByMonth();
       } catch (e) {
@@ -222,11 +267,13 @@ class BudgetViewModel extends ChangeNotifier {
         final existing = consolidatedBudgets[category]!;
         consolidatedBudgets[category] = existing.copyWith(
           amount: existing.amount + budget.amount,
-          spent: existing.spent + budget.spent,
+          spent: existing.spent,
         );
       } else {
         // Add new budget
-        consolidatedBudgets[category] = budget;
+        consolidatedBudgets[category] = budget.copyWith(
+          spent: _spentByCategory[category] ?? budget.spent,
+        );
       }
     }
     
@@ -237,6 +284,10 @@ class BudgetViewModel extends ChangeNotifier {
   Future<void> loadBudgetsForMonth(DateTime month) async {
     _selectedMonth = DateTime(month.year, month.month, 1); // Normalize to first day of month
     logger.info('Loading budgets for month: ${_selectedMonth.year}-${_selectedMonth.month}');
+
+    if (_latestTransactions.isNotEmpty) {
+      _recomputeSpentByCategoryFromTransactions(_latestTransactions);
+    }
     
     if (_allBudgets.isNotEmpty) {
       // If we already have budgets loaded, just filter them
@@ -349,6 +400,7 @@ class BudgetViewModel extends ChangeNotifier {
   void dispose() {
     // Cancel the budget subscription to prevent memory leaks
     _budgetSubscription?.cancel();
+    _transactionsSubscription?.cancel();
     logger.info('Disposing BudgetViewModel');
     super.dispose();
   }

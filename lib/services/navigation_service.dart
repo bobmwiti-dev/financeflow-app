@@ -179,7 +179,16 @@ class NavigationService {
       case AppConstants.signInRoute:
         return MaterialPageRoute(builder: (_) => const SignInScreen());
       case '/add_transaction':
-        return MaterialPageRoute(builder: (_) => const AddTransactionScreen());
+        final args = settings.arguments;
+        final type = args is Map ? args['type'] : null;
+        final expenseOnly = type == 'expense';
+        final initialIsExpense = type == 'income' ? false : true;
+        return MaterialPageRoute(
+          builder: (_) => AddTransactionScreen(
+            expenseOnly: expenseOnly,
+            initialIsExpense: initialIsExpense,
+          ),
+        );
       case '/transactions':
         return MaterialPageRoute(
           builder: (_) => const TransactionsScreen(),

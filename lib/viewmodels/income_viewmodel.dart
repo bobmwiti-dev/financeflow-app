@@ -42,7 +42,12 @@ class IncomeViewModel extends ChangeNotifier {
 
   /// Set selected month and refresh data
   void setSelectedMonth(DateTime month) {
-    _selectedMonth = DateTime(month.year, month.month, 1);
+    final next = DateTime(month.year, month.month, 1);
+    final current = _selectedMonth;
+    if (current != null && current.year == next.year && current.month == next.month) {
+      return;
+    }
+    _selectedMonth = next;
     notifyListeners();
   }
 
