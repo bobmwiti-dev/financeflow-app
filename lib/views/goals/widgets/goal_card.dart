@@ -13,6 +13,9 @@ class GoalCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onAddFunds;
 
+  static const double _radius = 24;
+  static const Color _accentColor = Color(0xFF6366F1);
+
   const GoalCard({
     super.key,
     required this.name,
@@ -26,30 +29,56 @@ class GoalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final currencyFormat = NumberFormat.currency(symbol: '\$');
     final progress = (targetAmount > 0) ? (currentAmount / targetAmount) : 0.0;
     final daysLeft = targetDate.difference(DateTime.now()).inDays;
     
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildCircularProgress(progress),
-                  const SizedBox(width: 16),
-                  _buildGoalDetails(currencyFormat, daysLeft),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _buildActionButtons(),
-            ],
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.surface,
+            colorScheme.surfaceContainerHighest,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(_radius),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.08),
+            blurRadius: 28,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(_radius),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(_radius),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildCircularProgress(progress),
+                    const SizedBox(width: 16),
+                    _buildGoalDetails(currencyFormat, daysLeft),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _buildActionButtons(),
+              ],
+            ),
           ),
         ),
       ),
@@ -146,7 +175,7 @@ class GoalCard extends StatelessWidget {
           label: const Text('Add Funds'),
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            backgroundColor: AppTheme.accentColor,
+            backgroundColor: _accentColor,
             foregroundColor: Colors.white,
             textStyle: const TextStyle(fontSize: 12),
           ),

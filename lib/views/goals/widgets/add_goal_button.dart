@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../../themes/app_theme.dart';
 
 class AddGoalButton extends StatelessWidget {
   final VoidCallback onPressed;
+
+  static const Color _accentColor = Color(0xFF6366F1);
 
   const AddGoalButton({
     super.key,
@@ -13,7 +14,7 @@ class AddGoalButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return FloatingActionButton(
       onPressed: onPressed,
-      backgroundColor: AppTheme.accentColor,
+      backgroundColor: _accentColor,
       foregroundColor: Colors.white,
       tooltip: 'Add Goal',
       child: const Icon(Icons.add),

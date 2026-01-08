@@ -20,6 +20,42 @@ class GoalDetailsScreen extends StatefulWidget {
 
 class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
 
+  static const Color _accentColor = Color(0xFF6366F1);
+
+  LinearGradient get _accentGradient => const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color(0xFF6366F1),
+          Color(0xFF8B5CF6),
+        ],
+      );
+
+  BoxDecoration _premiumCardDecoration(ThemeData theme, {double radius = 24}) {
+    final colorScheme = theme.colorScheme;
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          colorScheme.surface,
+          colorScheme.surfaceContainerHighest,
+        ],
+      ),
+      borderRadius: BorderRadius.circular(radius),
+      border: Border.all(
+        color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: colorScheme.shadow.withValues(alpha: 0.08),
+          blurRadius: 28,
+          offset: const Offset(0, 16),
+        ),
+      ],
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -33,6 +69,8 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
   Widget build(BuildContext context) {
     return Consumer<GoalViewModel>(
       builder: (context, viewModel, child) {
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
         final latestGoal = viewModel.goals.firstWhere(
           (g) => g.id == widget.goal.id,
           orElse: () => widget.goal,
@@ -40,10 +78,21 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
 
         return Scaffold(
           extendBodyBehindAppBar: true,
+          backgroundColor: Colors.transparent,
           appBar: AppBar(
-            title: Text(latestGoal.name),
-            backgroundColor: Colors.transparent,
             elevation: 0,
+            backgroundColor: Colors.transparent,
+            flexibleSpace: Container(
+              decoration: BoxDecoration(gradient: _accentGradient),
+            ),
+            title: Text(
+              latestGoal.name,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.2,
+              ),
+            ),
             foregroundColor: Colors.white,
             actions: [
               IconButton(
@@ -59,38 +108,50 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
               ),
             ],
           ),
-          body: CustomScrollView(
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                sliver: SliverToBoxAdapter(
-                  child: Column(
-                    children: [
-                      SizedBox(height: kToolbarHeight + MediaQuery.of(context).padding.top),
-                      _buildHeader(context, latestGoal),
-                      const SizedBox(height: 24),
-                      _buildInfoCard(context, latestGoal),
-                      const SizedBox(height: 16),
-                      if (latestGoal.targetMonthlyContribution != null &&
-                          latestGoal.targetMonthlyContribution! > 0)
-                        _buildMonthlyPlanCard(context, latestGoal),
-                      const SizedBox(height: 16),
-                      _buildContributionHistoryHeader(context, latestGoal),
-                    ],
+          body: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  colorScheme.surface,
+                  colorScheme.surfaceContainerHighest,
+                ],
+              ),
+            ),
+            child: CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                  sliver: SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        SizedBox(height: kToolbarHeight + MediaQuery.of(context).padding.top),
+                        _buildHeader(context, latestGoal),
+                        const SizedBox(height: 24),
+                        _buildInfoCard(context, latestGoal),
+                        const SizedBox(height: 16),
+                        if (latestGoal.targetMonthlyContribution != null &&
+                            latestGoal.targetMonthlyContribution! > 0)
+                          _buildMonthlyPlanCard(context, latestGoal),
+                        const SizedBox(height: 16),
+                        _buildContributionHistoryHeader(context, latestGoal),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              ..._buildContributionHistorySlivers(context, latestGoal),
-              const SliverToBoxAdapter(
-                child: SizedBox(height: 24),
-              ),
-            ],
+                ..._buildContributionHistorySlivers(context, latestGoal),
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: 24),
+                ),
+              ],
+            ),
           ),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () => _showAddFundsDialog(context, latestGoal),
             label: const Text('Add Funds'),
             icon: const Icon(Icons.add),
-            backgroundColor: AppTheme.accentColor,
+            backgroundColor: _accentColor,
           ),
         );
       },
@@ -98,6 +159,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
   }
 
   Widget _buildHeader(BuildContext context, Goal currentGoal) {
+    final theme = Theme.of(context);
     final progress = (currentGoal.currentAmount / currentGoal.targetAmount).clamp(0.0, 1.0);
     final progressPercent = (progress * 100).toStringAsFixed(1);
     // Using CurrencyService via toCurrency() extension
@@ -116,8 +178,14 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Theme.of(context).cardColor,
-          boxShadow: AppTheme.boxShadow,
+          color: theme.colorScheme.surface,
+          boxShadow: [
+            BoxShadow(
+              color: theme.colorScheme.shadow.withValues(alpha: 0.08),
+              blurRadius: 28,
+              offset: const Offset(0, 16),
+            ),
+          ],
         ),
         child: SizedBox(
           width: 180,
@@ -167,26 +235,34 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
   }
 
   Widget _buildInfoCard(BuildContext context, Goal currentGoal) {
-        final locale = Localizations.localeOf(context).toString();
-        final dateFormat = DateFormat('MMM dd, yyyy', locale);
-    return Card(
+    final theme = Theme.of(context);
+    final locale = Localizations.localeOf(context).toString();
+    final dateFormat = DateFormat('MMM dd, yyyy', locale);
+    return Container(
+      decoration: _premiumCardDecoration(theme),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(currentGoal.name, style: Theme.of(context).textTheme.headlineSmall),
+            Text(currentGoal.name, style: theme.textTheme.headlineSmall),
             if (currentGoal.description != null && currentGoal.description!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8.0),
-                child: Text(currentGoal.description!, style: Theme.of(context).textTheme.bodyMedium),
+                child: Text(currentGoal.description!, style: theme.textTheme.bodyMedium),
               ),
             const SizedBox(height: 16),
             Row(
               children: [
-                const Icon(Icons.calendar_today_outlined, size: 16, color: Colors.grey),
+                Icon(
+                  Icons.calendar_today_outlined,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: 8),
-                Text('Target by: ${currentGoal.targetDate != null ? dateFormat.format(currentGoal.targetDate!) : 'N/A'}'),
+                Text(
+                  'Target by: ${currentGoal.targetDate != null ? dateFormat.format(currentGoal.targetDate!) : 'N/A'}',
+                ),
               ],
             ),
           ],
@@ -197,67 +273,29 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
 
   Widget _buildMonthlyPlanCard(BuildContext context, Goal currentGoal) {
     // Using CurrencyService via toCurrency() extension
-    return Card(
+    final theme = Theme.of(context);
+    return Container(
+      decoration: _premiumCardDecoration(theme),
       child: ListTile(
-        leading: const Icon(Icons.schedule, color: AppTheme.primaryColor),
+        leading: Icon(Icons.schedule, color: _accentColor),
         title: const Text('Monthly Plan'),
-        subtitle: Text('Target: ${(currentGoal.targetMonthlyContribution ?? 0.0).toCurrency()} / month'),
-      ),
-    );
-  }
-
-  Widget _buildContributionHistory(BuildContext context, Goal currentGoal) {
-    final viewModel = context.watch<GoalViewModel>();
-    final contributions = viewModel.contributions;
-        final locale = Localizations.localeOf(context).toString();
-        final dateFormat = DateFormat('MMM dd, yyyy', locale);
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Contribution History', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            if (contributions.isEmpty)
-              const Center(
-                child: Text(
-                  'No contributions recorded yet.',
-                  style: TextStyle(color: AppTheme.secondaryTextColor),
-                ),
-              )
-            else
-              SizedBox(
-                height: (contributions.length * 56.0).clamp(120.0, 360.0),
-                child: ListView.separated(
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: contributions.length,
-                  itemBuilder: (context, index) {
-                    final contribution = contributions[index];
-                    return ListTile(
-                      leading: const Icon(Icons.arrow_upward, color: AppTheme.successColor),
-                      title: Text('+ ${contribution.amount.toCurrency()}'),
-                      trailing: Text(dateFormat.format(contribution.date)),
-                    );
-                  },
-                  separatorBuilder: (context, index) => const Divider(height: 1),
-                ),
-              ),
-          ],
+        subtitle: Text(
+          'Target: ${(currentGoal.targetMonthlyContribution ?? 0.0).toCurrency()} / month',
         ),
       ),
     );
   }
 
   Widget _buildContributionHistoryHeader(BuildContext context, Goal currentGoal) {
-    return Card(
+    final theme = Theme.of(context);
+    return Container(
+      decoration: _premiumCardDecoration(theme),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Contribution History', style: Theme.of(context).textTheme.titleLarge),
+            Text('Contribution History', style: theme.textTheme.titleLarge),
             const SizedBox(height: 16),
           ],
         ),
@@ -273,11 +311,12 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
 
     if (contributions.isEmpty) {
       return [
-        const SliverPadding(
-          padding: EdgeInsets.symmetric(horizontal: 16.0),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
           sliver: SliverToBoxAdapter(
-            child: Card(
-              child: Padding(
+            child: Container(
+              decoration: _premiumCardDecoration(Theme.of(context)),
+              child: const Padding(
                 padding: EdgeInsets.all(16.0),
                 child: Center(
                   child: Text(
@@ -299,7 +338,11 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
           itemCount: contributions.length,
           itemBuilder: (context, index) {
             final contribution = contributions[index];
-            return Card(
+            return Container(
+              decoration: _premiumCardDecoration(
+                Theme.of(context),
+                radius: 16,
+              ),
               child: ListTile(
                 leading: const Icon(Icons.arrow_upward, color: AppTheme.successColor),
                 title: Text('+ ${contribution.amount.toCurrency()}'),
@@ -313,50 +356,149 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
     ];
   }
 
-    void _showAddFundsDialog(BuildContext context, Goal currentGoal) {
+  void _showAddFundsDialog(BuildContext context, Goal currentGoal) {
     final amountController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Add Funds'),
-          content: TextField(
-            controller: amountController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Amount',
-              prefixText: '\$',
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: _premiumCardDecoration(theme),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: _accentGradient,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.add_circle_outline_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ShaderMask(
+                        shaderCallback: (bounds) => _accentGradient.createShader(bounds),
+                        child: const Text(
+                          'Add Funds',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: _accentColor.withValues(alpha: 0.2),
+                    ),
+                    gradient: LinearGradient(
+                      colors: [
+                        _accentColor.withValues(alpha: 0.02),
+                        colorScheme.surface,
+                      ],
+                    ),
+                  ),
+                  child: TextField(
+                    controller: amountController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'Amount',
+                      prefixText: '\$',
+                      prefixStyle: TextStyle(
+                        color: _accentColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.all(16),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final amount = double.tryParse(amountController.text);
+                          if (amount != null && amount > 0) {
+                            final viewModel = context.read<GoalViewModel>();
+                            final navigator = Navigator.of(context);
+                            final messenger = ScaffoldMessenger.of(context);
+
+                            final success = await viewModel.updateGoalProgress(currentGoal, amount);
+
+                            if (!mounted) return;
+
+                            navigator.pop();
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(success ? 'Contribution added!' : 'Failed to add contribution'),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _accentColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'Add',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final amount = double.tryParse(amountController.text);
-                if (amount != null && amount > 0) {
-                  final viewModel = context.read<GoalViewModel>();
-                  final navigator = Navigator.of(context);
-                  final messenger = ScaffoldMessenger.of(context);
-
-                  final success = await viewModel.updateGoalProgress(currentGoal, amount);
-
-                  if (!mounted) return;
-
-                  navigator.pop();
-                  messenger.showSnackBar(
-                    SnackBar(
-                      content: Text(success ? 'Contribution added!' : 'Failed to add contribution'),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                }
-              },
-              child: const Text('Add'),
-            ),
-          ],
         );
       },
     );

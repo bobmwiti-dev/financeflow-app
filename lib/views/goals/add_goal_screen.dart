@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 
 import '../../models/goal_model.dart';
 import '../../viewmodels/goal_viewmodel.dart';
-import '../../themes/app_theme.dart';
 import '../../widgets/common/icon_display.dart';
 
 class AddGoalScreen extends StatefulWidget {
@@ -23,6 +22,42 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
   DateTime? _targetDate;
   String? _selectedIcon;
   bool _isSaving = false;
+
+  static const Color _accentColor = Color(0xFF6366F1);
+
+  LinearGradient get _accentGradient => const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color(0xFF6366F1),
+          Color(0xFF8B5CF6),
+        ],
+      );
+
+  BoxDecoration _premiumCardDecoration(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          colorScheme.surface,
+          colorScheme.surfaceContainerHighest,
+        ],
+      ),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(
+        color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: colorScheme.shadow.withValues(alpha: 0.08),
+          blurRadius: 28,
+          offset: const Offset(0, 16),
+        ),
+      ],
+    );
+  }
 
   @override
   void dispose() {
@@ -80,85 +115,129 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final dateFormat = DateFormat('MMM dd, yyyy');
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('Add Goal'),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(gradient: _accentGradient),
+        ),
+        title: ShaderMask(
+          shaderCallback: (bounds) => const LinearGradient(
+            colors: [Colors.white, Colors.white70],
+          ).createShader(bounds),
+          child: const Text(
+            'Add Goal',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ),
+        foregroundColor: Colors.white,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Goal name'),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter a name' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _targetAmountController,
-                decoration: const InputDecoration(
-                  labelText: 'Target amount',
-                  prefixText: '\$',
-                  hintText: 'e.g., 5000',
-                ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (v) {
-                  final value = double.tryParse(v ?? '');
-                  if (value == null || value <= 0) return 'Enter a valid amount';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Target date'),
-                subtitle: Text(_targetDate != null ? dateFormat.format(_targetDate!) : 'Select date'),
-                trailing: IconButton(
-                  icon: const Icon(Icons.calendar_today_outlined),
-                  onPressed: _pickDate,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(labelText: 'Description (optional)'),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _contributionController,
-                decoration: const InputDecoration(labelText: 'Target monthly contribution (optional)', prefixText: '\$'),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              ),
-              const SizedBox(height: 24),
-              Text('Choose an icon', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 4),
-              Text(
-                'Select an icon that represents your goal category',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 12),
-              _buildIconPicker(),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.accentColor,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: _isSaving
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Save Goal'),
-                ),
-              ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              colorScheme.surface,
+              colorScheme.surfaceContainerHighest,
             ],
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Container(
+            decoration: _premiumCardDecoration(theme),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(labelText: 'Goal name'),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter a name' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _targetAmountController,
+                      decoration: const InputDecoration(
+                        labelText: 'Target amount',
+                        prefixText: '\$',
+                        hintText: 'e.g., 5000',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (v) {
+                        final value = double.tryParse(v ?? '');
+                        if (value == null || value <= 0) return 'Enter a valid amount';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Target date'),
+                      subtitle: Text(
+                        _targetDate != null ? dateFormat.format(_targetDate!) : 'Select date',
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.calendar_today_outlined),
+                        onPressed: _pickDate,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _descriptionController,
+                      decoration: const InputDecoration(labelText: 'Description (optional)'),
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _contributionController,
+                      decoration: const InputDecoration(
+                        labelText: 'Target monthly contribution (optional)',
+                        prefixText: '\$',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                    const SizedBox(height: 24),
+                    Text('Choose an icon', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Select an icon that represents your goal category',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildIconPicker(),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isSaving ? null : _save,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _accentColor,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: _isSaving
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : const Text('Save Goal'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -204,9 +283,9 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                     height: 60,
                     width: 60,
                     decoration: BoxDecoration(
-                      color: isSelected ? AppTheme.accentColor : Colors.grey.shade200,
+                      color: isSelected ? _accentColor : Colors.grey.shade200,
                       borderRadius: BorderRadius.circular(10),
-                      border: isSelected ? Border.all(color: AppTheme.primaryColor, width: 2) : null,
+                      border: isSelected ? Border.all(color: _accentColor, width: 2) : null,
                     ),
                     child: Center(
                       child: IconDisplay(
@@ -221,7 +300,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                     description,
                     style: TextStyle(
                       fontSize: 10,
-                      color: isSelected ? AppTheme.accentColor : Colors.grey.shade600,
+                      color: isSelected ? _accentColor : Colors.grey.shade600,
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                       height: 1.1, // Tighter line height
                     ),

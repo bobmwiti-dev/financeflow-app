@@ -36,6 +36,42 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
   late AnimationController _listAnimationController;
   bool _isInteractiveMode = false;
 
+  static const Color _accentColor = Color(0xFF6366F1);
+
+  LinearGradient get _accentGradient => const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color(0xFF6366F1),
+          Color(0xFF8B5CF6),
+        ],
+      );
+
+  BoxDecoration _premiumCardDecoration(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          colorScheme.surface,
+          colorScheme.surfaceContainerHighest,
+        ],
+      ),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(
+        color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: colorScheme.shadow.withValues(alpha: 0.08),
+          blurRadius: 28,
+          offset: const Offset(0, 16),
+        ),
+      ],
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -150,12 +186,33 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('Savings Goals'),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(gradient: _accentGradient),
+        ),
+        title: ShaderMask(
+          shaderCallback: (bounds) => const LinearGradient(
+            colors: [Colors.white, Colors.white70],
+          ).createShader(bounds),
+          child: const Text(
+            'Savings Goals',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.sort),
+            color: Colors.white,
             onPressed: _showSortOptions,
           ),
         ],
@@ -164,18 +221,29 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
         selectedIndex: _selectedIndex,
         onItemSelected: _onItemSelected,
       ),
-      body: Consumer<GoalViewModel>(
-        builder: (context, goalViewModel, child) {
-
-          return Column(
-            children: [
-              _buildSummaryCard(goalViewModel),
-              Expanded(
-                child: _buildGoalsList(goalViewModel),
-              ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              colorScheme.surface,
+              colorScheme.surfaceContainerHighest,
             ],
-          );
-        },
+          ),
+        ),
+        child: Consumer<GoalViewModel>(
+          builder: (context, goalViewModel, child) {
+            return Column(
+              children: [
+                _buildSummaryCard(goalViewModel),
+                Expanded(
+                  child: _buildGoalsList(goalViewModel),
+                ),
+              ],
+            );
+          },
+        ),
       ),
       floatingActionButton: AddGoalButton(
         onPressed: () async {
@@ -199,6 +267,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
   }
 
   Widget _buildSummaryCard(GoalViewModel viewModel) {
+    final theme = Theme.of(context);
     final currencyFormat = NumberFormat.currency(symbol: '\$');
     
     final totalGoals = viewModel.getTotalSavingsGoals();
@@ -218,31 +287,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
       },
       child: Container(
         margin: const EdgeInsets.all(16.0),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white,
-              AppTheme.primaryColor.withValues(alpha: 0.02),
-              Colors.white,
-            ],
-            stops: const [0.0, 0.5, 1.0],
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.primaryColor.withValues(alpha: 0.1),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
+        decoration: _premiumCardDecoration(theme),
         child: AnimatedBuilder(
           animation: _summaryAnimationController,
           builder: (context, child) {
@@ -256,17 +301,12 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              AppTheme.primaryColor.withValues(alpha: 0.1),
-                              AppTheme.primaryColor.withValues(alpha: 0.05),
-                            ],
-                          ),
+                          gradient: _accentGradient,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
                           Icons.savings_rounded,
-                          color: AppTheme.primaryColor,
+                          color: Colors.white,
                           size: 24,
                         ),
                       ),
@@ -276,12 +316,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             ShaderMask(
-                              shaderCallback: (bounds) => LinearGradient(
-                                colors: [
-                                  AppTheme.primaryColor,
-                                  AppTheme.primaryColor.withValues(alpha: 0.8),
-                                ],
-                              ).createShader(bounds),
+                              shaderCallback: (bounds) => _accentGradient.createShader(bounds),
                               child: const Text(
                                 'Total Savings Progress',
                                 style: TextStyle(
@@ -309,7 +344,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                         duration: const Duration(milliseconds: 300),
                         child: Icon(
                           Icons.expand_more_rounded,
-                          color: AppTheme.primaryColor.withValues(alpha: 0.7),
+                          color: _accentColor.withValues(alpha: 0.8),
                         ),
                       ),
                     ],
@@ -577,26 +612,21 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppTheme.primaryColor.withValues(alpha: 0.1),
-                      AppTheme.primaryColor.withValues(alpha: 0.05),
-                    ],
-                  ),
+                  gradient: _accentGradient,
                   borderRadius: BorderRadius.circular(32),
                 ),
                 child: Icon(
                   Icons.savings_rounded,
                   size: 64,
-                  color: AppTheme.primaryColor.withValues(alpha: 0.7),
+                  color: Colors.white.withValues(alpha: 0.9),
                 ),
               ),
               const SizedBox(height: 24),
               ShaderMask(
                 shaderCallback: (bounds) => LinearGradient(
                   colors: [
-                    AppTheme.primaryColor,
-                    AppTheme.primaryColor.withValues(alpha: 0.7),
+                    _accentColor,
+                    _accentColor.withValues(alpha: 0.7),
                   ],
                 ).createShader(bounds),
                 child: const Text(
@@ -626,13 +656,13 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      AppTheme.primaryColor.withValues(alpha: 0.1),
-                      AppTheme.primaryColor.withValues(alpha: 0.05),
+                      _accentColor.withValues(alpha: 0.1),
+                      _accentColor.withValues(alpha: 0.05),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.2),
+                    color: _accentColor.withValues(alpha: 0.2),
                   ),
                 ),
                 child: Row(
@@ -640,14 +670,14 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                   children: [
                     Icon(
                       Icons.add_circle_outline_rounded,
-                      color: AppTheme.primaryColor,
+                      color: _accentColor,
                       size: 20,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'Tap the + button to get started',
                       style: TextStyle(
-                        color: AppTheme.primaryColor,
+                        color: _accentColor,
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
                       ),
@@ -745,7 +775,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                 end: Alignment.bottomRight,
                 colors: [
                   Colors.white,
-                  AppTheme.primaryColor.withValues(alpha: 0.02),
+                  _accentColor.withValues(alpha: 0.02),
                   Colors.white,
                 ],
               ),
@@ -766,15 +796,15 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        AppTheme.primaryColor.withValues(alpha: 0.1),
-                        AppTheme.primaryColor.withValues(alpha: 0.05),
+                        _accentColor.withValues(alpha: 0.1),
+                        _accentColor.withValues(alpha: 0.05),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
                     Icons.add_circle_outline_rounded,
-                    color: AppTheme.primaryColor,
+                    color: _accentColor,
                     size: 32,
                   ),
                 ),
@@ -782,8 +812,8 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                 ShaderMask(
                   shaderCallback: (bounds) => LinearGradient(
                     colors: [
-                      AppTheme.primaryColor,
-                      AppTheme.primaryColor.withValues(alpha: 0.8),
+                      _accentColor,
+                      _accentColor.withValues(alpha: 0.8),
                     ],
                   ).createShader(bounds),
                   child: Text(
@@ -812,11 +842,11 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.2),
+                      color: _accentColor.withValues(alpha: 0.2),
                     ),
                     gradient: LinearGradient(
                       colors: [
-                        AppTheme.primaryColor.withValues(alpha: 0.02),
+                        _accentColor.withValues(alpha: 0.02),
                         Colors.white,
                       ],
                     ),
@@ -832,7 +862,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                       labelText: 'Amount to add',
                       prefixText: '\$',
                       prefixStyle: TextStyle(
-                        color: AppTheme.primaryColor,
+                        color: _accentColor,
                         fontWeight: FontWeight.bold,
                       ),
                       border: OutlineInputBorder(
@@ -887,7 +917,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                           Navigator.pop(context);
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor,
+                          backgroundColor: _accentColor,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
