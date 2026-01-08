@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -24,51 +23,33 @@ class PremiumBudgetPieChart extends StatefulWidget {
 class _PremiumBudgetPieChartState extends State<PremiumBudgetPieChart> 
     with TickerProviderStateMixin {
   int touchedIndex = -1;
-  late AnimationController _rotationController;
   late AnimationController _scaleController;
-  late AnimationController _pulseController;
-  late AnimationController _shimmerController;
   late Animation<double> _scaleAnimation;
-  late Animation<double> _pulseAnimation;
-  late Animation<double> _shimmerAnimation;
   bool _isHovering = false;
   
   // Premium color palette with gradients
   final List<List<Color>> _premiumGradients = [
-    [const Color(0xFF667EEA), const Color(0xFF764BA2)], // Purple gradient
-    [const Color(0xFFF093FB), const Color(0xFFF5576C)], // Pink gradient
-    [const Color(0xFF4FACFE), const Color(0xFF00F2FE)], // Blue gradient
-    [const Color(0xFF43E97B), const Color(0xFF38F9D7)], // Green gradient
-    [const Color(0xFFFA709A), const Color(0xFFFEE140)], // Sunset gradient
-    [const Color(0xFF30CFD0), const Color(0xFF330867)], // Ocean gradient
-    [const Color(0xFFA8EDEA), const Color(0xFFFED6E3)], // Soft gradient
-    [const Color(0xFFFF9A9E), const Color(0xFFFECFEF)], // Rose gradient
-    [const Color(0xFFFBC2EB), const Color(0xFFA6C1EE)], // Lavender gradient
-    [const Color(0xFFFDCBF1), const Color(0xFFE6DEE9)], // Mist gradient
+    [const Color(0xFF6366F1), const Color(0xFF8B5CF6)], // indigo -> violet
+    [const Color(0xFF06B6D4), const Color(0xFF3B82F6)], // cyan -> blue
+    [const Color(0xFF10B981), const Color(0xFF34D399)], // emerald -> mint
+    [const Color(0xFFF59E0B), const Color(0xFFF97316)], // amber -> orange
+    [const Color(0xFFEF4444), const Color(0xFFF97316)], // red -> orange
+    [const Color(0xFFEC4899), const Color(0xFFF472B6)], // pink -> rose
+    [const Color(0xFF22C55E), const Color(0xFF84CC16)], // green -> lime
+    [const Color(0xFF14B8A6), const Color(0xFF06B6D4)], // teal -> cyan
+    [const Color(0xFF0EA5E9), const Color(0xFF38BDF8)], // sky -> light blue
+    [const Color(0xFFA855F7), const Color(0xFF6366F1)], // purple -> indigo
+    [const Color(0xFFFB7185), const Color(0xFFEC4899)], // salmon -> pink
+    [const Color(0xFF4ADE80), const Color(0xFF10B981)], // light green -> emerald
   ];
 
   @override
   void initState() {
     super.initState();
-    _rotationController = AnimationController(
-      duration: const Duration(seconds: 25),
-      vsync: this,
-    )..repeat();
-    
     _scaleController = AnimationController(
       duration: const Duration(milliseconds: 400),
       vsync: this,
     );
-    
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    )..repeat(reverse: true);
-    
-    _shimmerController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    )..repeat();
     
     _scaleAnimation = Tween<double>(
       begin: 1.0,
@@ -77,43 +58,30 @@ class _PremiumBudgetPieChartState extends State<PremiumBudgetPieChart>
       parent: _scaleController,
       curve: Curves.elasticOut,
     ));
-    
-    _pulseAnimation = Tween<double>(
-      begin: 0.95,
-      end: 1.05,
-    ).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    ));
-    
-    _shimmerAnimation = Tween<double>(
-      begin: -1.0,
-      end: 2.0,
-    ).animate(CurvedAnimation(
-      parent: _shimmerController,
-      curve: Curves.easeInOut,
-    ));
   }
 
   @override
   void dispose() {
-    _rotationController.dispose();
     _scaleController.dispose();
-    _pulseController.dispose();
-    _shimmerController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     final totalSpent = widget.budgets.fold(0.0, (sum, b) => sum + b.spent);
-    final totalBudgeted = widget.budgets.fold(0.0, (sum, b) => sum + b.amount);
-    final percentageUsed = totalBudgeted > 0 ? (totalSpent / totalBudgeted * 100) : 0.0;
+    final fallbackBudgeted = widget.budgets.fold(0.0, (sum, b) => sum + b.amount);
+    final totalBudgeted = widget.totalBudget > 0 ? widget.totalBudget : fallbackBudgeted;
+    final percentageUsed = totalBudgeted > 0
+        ? (totalSpent / totalBudgeted * 100)
+        : (totalSpent > 0 ? 100.0 : 0.0);
     
     return Column(
       children: [
         // Premium header with stats
-        _buildPremiumHeader(totalSpent, totalBudgeted, percentageUsed),
+        _buildPremiumHeader(totalSpent, totalBudgeted),
         
         const SizedBox(height: 20),
         
@@ -126,74 +94,36 @@ class _PremiumBudgetPieChartState extends State<PremiumBudgetPieChart>
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Multi-layer animated background
-                AnimatedBuilder(
-                  animation: _rotationController,
-                  builder: (context, child) {
-                    return Transform.rotate(
-                      angle: _rotationController.value * 2 * math.pi,
-                      child: Container(
-                        width: 280,
-                        height: 280,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              Colors.blue.withValues(alpha: 0.1),
-                              Colors.purple.withValues(alpha: 0.05),
-                              Colors.transparent,
-                            ],
-                            stops: const [0.0, 0.7, 1.0],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                
-                // Shimmer effect layer
-                AnimatedBuilder(
-                  animation: _shimmerAnimation,
-                  builder: (context, child) {
-                    return Container(
-                      width: 260,
-                      height: 260,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment(-1.0 + _shimmerAnimation.value, -1.0),
-                          end: Alignment(1.0 + _shimmerAnimation.value, 1.0),
-                          colors: [
-                            Colors.transparent,
-                            Colors.white.withValues(alpha: 0.1),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.5, 1.0],
-                        ),
-                      ),
-                    );
-                  },
+                Container(
+                  width: 280,
+                  height: 280,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        const Color(0xFF6366F1).withValues(alpha: 0.12),
+                        const Color(0xFF8B5CF6).withValues(alpha: 0.06),
+                        Colors.transparent,
+                      ],
+                      stops: const [0.0, 0.7, 1.0],
+                    ),
+                  ),
                 ),
                 
                 // The enhanced pie chart
                 AnimatedBuilder(
-                  animation: Listenable.merge([_scaleAnimation, _pulseAnimation]),
+                  animation: _scaleAnimation,
                   builder: (context, child) {
                     return Transform.scale(
-                      scale: _scaleAnimation.value * (_isHovering ? _pulseAnimation.value : 1.0),
+                      scale: _scaleAnimation.value * (_isHovering ? 1.02 : 1.0),
                       child: Container(
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 25,
-                              offset: const Offset(0, 12),
-                            ),
-                            BoxShadow(
-                              color: Colors.white.withValues(alpha: 0.8),
-                              blurRadius: 15,
-                              offset: const Offset(0, -8),
+                              color: colorScheme.shadow.withValues(alpha: 0.12),
+                              blurRadius: 24,
+                              offset: const Offset(0, 16),
                             ),
                           ],
                         ),
@@ -226,23 +156,17 @@ class _PremiumBudgetPieChartState extends State<PremiumBudgetPieChart>
                   },
                 ),
                 
-                // Enhanced center display with pulse
-                AnimatedBuilder(
-                  animation: _pulseAnimation,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: _pulseAnimation.value,
-                      child: _buildEnhancedCenterDisplay(percentageUsed),
-                    );
-                  },
+                _buildEnhancedCenterDisplay(
+                  percentageUsed,
+                  totalSpent: totalSpent,
+                  totalBudgeted: totalBudgeted,
                 ),
               ],
             ),
           ),
         ).animate()
           .fadeIn(duration: 800.ms)
-          .scale(begin: const Offset(0.7, 0.7), duration: 800.ms, curve: Curves.easeOutBack)
-          .shimmer(duration: 1500.ms, delay: 500.ms),
+          .scale(begin: const Offset(0.7, 0.7), duration: 800.ms, curve: Curves.easeOutBack),
         
         const SizedBox(height: 20),
         
@@ -252,7 +176,9 @@ class _PremiumBudgetPieChartState extends State<PremiumBudgetPieChart>
     );
   }
 
-  Widget _buildPremiumHeader(double totalSpent, double totalBudgeted, double percentageUsed) {
+  Widget _buildPremiumHeader(double totalSpent, double totalBudgeted) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final remaining = totalBudgeted - totalSpent;
     final isOverBudget = remaining < 0;
     
@@ -260,17 +186,22 @@ class _PremiumBudgetPieChartState extends State<PremiumBudgetPieChart>
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
           colors: [
-            Colors.white,
-            Colors.grey.shade50,
+            colorScheme.surface,
+            colorScheme.surfaceContainerHighest,
           ],
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 5),
+            color: colorScheme.shadow.withValues(alpha: 0.08),
+            blurRadius: 28,
+            offset: const Offset(0, 16),
           ),
         ],
       ),
@@ -281,7 +212,7 @@ class _PremiumBudgetPieChartState extends State<PremiumBudgetPieChart>
             'Spent',
             totalSpent.toCurrency(),
             Icons.trending_down,
-            Colors.orange,
+            const Color(0xFF8B5CF6),
           ),
           Container(
             width: 1,
@@ -292,7 +223,7 @@ class _PremiumBudgetPieChartState extends State<PremiumBudgetPieChart>
             'Budget',
             totalBudgeted.toCurrency(),
             Icons.account_balance_wallet,
-            Colors.blue,
+            const Color(0xFF6366F1),
           ),
           Container(
             width: 1,
@@ -303,7 +234,7 @@ class _PremiumBudgetPieChartState extends State<PremiumBudgetPieChart>
             'Remaining',
             remaining.abs().toCurrency(),
             isOverBudget ? Icons.warning : Icons.check_circle,
-            isOverBudget ? Colors.red : Colors.green,
+            isOverBudget ? Colors.red : const Color(0xFF6366F1),
           ),
         ],
       ),
@@ -337,7 +268,12 @@ class _PremiumBudgetPieChartState extends State<PremiumBudgetPieChart>
     );
   }
 
-  Widget _buildEnhancedCenterDisplay(double percentageUsed) {
+  Widget _buildEnhancedCenterDisplay(
+    double percentageUsed, {
+    required double totalSpent,
+    required double totalBudgeted,
+  }) {
+    final isOverBudget = totalBudgeted > 0 && totalSpent > totalBudgeted;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -348,11 +284,9 @@ class _PremiumBudgetPieChartState extends State<PremiumBudgetPieChart>
             fontWeight: FontWeight.bold,
             foreground: Paint()
               ..shader = LinearGradient(
-                colors: percentageUsed > 100 
+                colors: isOverBudget
                     ? [Colors.red, Colors.orange]
-                    : percentageUsed > 80 
-                        ? [Colors.orange, Colors.amber]
-                        : [Colors.blue, Colors.green],
+                    : [const Color(0xFF6366F1), const Color(0xFF8B5CF6)],
               ).createShader(const Rect.fromLTWH(0, 0, 100, 50)),
           ),
         ),
@@ -363,6 +297,15 @@ class _PremiumBudgetPieChartState extends State<PremiumBudgetPieChart>
             color: Colors.grey.shade600,
           ),
         ),
+        const SizedBox(height: 4),
+        Text(
+          totalSpent.toCurrency(),
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade700,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     ).animate()
       .fadeIn(delay: 800.ms, duration: 500.ms)
@@ -370,7 +313,8 @@ class _PremiumBudgetPieChartState extends State<PremiumBudgetPieChart>
   }
 
   List<PieChartSectionData> _buildEnhancedSections() {
-    if (widget.budgets.isEmpty) {
+    final effectiveBudgets = widget.budgets.where((b) => b.amount > 0 || b.spent > 0).toList();
+    if (effectiveBudgets.isEmpty) {
       return [
         PieChartSectionData(
           gradient: LinearGradient(
@@ -388,12 +332,14 @@ class _PremiumBudgetPieChartState extends State<PremiumBudgetPieChart>
       ];
     }
 
-    return widget.budgets.asMap().entries.map((entry) {
+    return effectiveBudgets.asMap().entries.map((entry) {
       final index = entry.key;
       final budget = entry.value;
       final isTouched = index == touchedIndex;
       final gradientColors = _premiumGradients[index % _premiumGradients.length];
       final isOverBudget = budget.spent > budget.amount;
+      final sectionValue = budget.amount > 0 ? budget.amount : budget.spent;
+      final separatorColor = Theme.of(context).colorScheme.surface.withValues(alpha: 0.95);
       
       return PieChartSectionData(
         gradient: LinearGradient(
@@ -408,8 +354,12 @@ class _PremiumBudgetPieChartState extends State<PremiumBudgetPieChart>
           end: Alignment.bottomRight,
           stops: isTouched ? [0.0, 0.5, 1.0] : [0.0, 1.0],
         ),
-        value: budget.amount,
-        title: isTouched ? '\$${budget.amount.toStringAsFixed(0)}' : '',
+        borderSide: BorderSide(
+          color: separatorColor,
+          width: isTouched ? 3 : 2,
+        ),
+        value: sectionValue,
+        title: isTouched ? budget.amount.toCurrency() : '',
         radius: isTouched ? 80 : 65,
         titleStyle: TextStyle(
           fontSize: isTouched ? 18 : 14,
@@ -445,7 +395,7 @@ class _PremiumBudgetPieChartState extends State<PremiumBudgetPieChart>
         ? Colors.red 
         : percentUsed > 80 
             ? Colors.orange 
-            : Colors.green;
+            : const Color(0xFF6366F1);
     
     const size = 32.0;
     
@@ -483,15 +433,17 @@ class _PremiumBudgetPieChartState extends State<PremiumBudgetPieChart>
   }
 
   Widget _buildInteractiveLegend() {
+    final effectiveBudgets = widget.budgets.where((b) => b.amount > 0 || b.spent > 0).toList();
     return SizedBox(
       height: 80,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: widget.budgets.length,
+        itemCount: effectiveBudgets.length,
         itemBuilder: (context, index) {
-          final budget = widget.budgets[index];
+          final budget = effectiveBudgets[index];
           final gradientColors = _premiumGradients[index % _premiumGradients.length];
           final isSelected = index == touchedIndex;
+          final percentUsed = budget.amount > 0 ? (budget.spent / budget.amount * 100) : 0.0;
           
           return GestureDetector(
             onTap: () {
@@ -549,18 +501,18 @@ class _PremiumBudgetPieChartState extends State<PremiumBudgetPieChart>
                   ),
                   const SizedBox(height: 4),
                   LinearProgressIndicator(
-                    value: (budget.percentUsed / 100).clamp(0.0, 1.0),
+                    value: (percentUsed / 100).clamp(0.0, 1.0),
                     backgroundColor: isSelected 
                         ? Colors.white.withValues(alpha:0.3)
                         : Colors.grey.shade200,
                     valueColor: AlwaysStoppedAnimation<Color>(
                       isSelected 
                           ? Colors.white
-                          : budget.percentUsed > 100 
+                          : percentUsed > 100 
                               ? Colors.red 
-                              : budget.percentUsed > 80 
+                              : percentUsed > 80 
                                   ? Colors.orange 
-                                  : Colors.green,
+                                  : const Color(0xFF6366F1),
                     ),
                     minHeight: 4,
                   ),

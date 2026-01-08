@@ -14,6 +14,7 @@ class PremiumBudgetTimeline extends StatefulWidget {
   final String selectedCategory;
   final Function(String) onCategoryChanged;
   final DateTime selectedMonth;
+  final ValueChanged<DateTime>? onMonthChanged;
 
   const PremiumBudgetTimeline({
     super.key,
@@ -24,6 +25,7 @@ class PremiumBudgetTimeline extends StatefulWidget {
     required this.selectedCategory,
     required this.onCategoryChanged,
     required this.selectedMonth,
+    this.onMonthChanged,
   });
 
   @override
@@ -529,8 +531,14 @@ class _PremiumBudgetTimelineState extends State<PremiumBudgetTimeline>
     final chartData = _processChartData();
     if (chartData.isEmpty) return const SizedBox.shrink();
     
-    final totalBudget = chartData.fold(0.0, (sum, d) => sum + d['budget']!);
-    final totalActual = chartData.fold(0.0, (sum, d) => sum + d['actual']!);
+    final totalBudget = chartData.fold<double>(
+      0.0,
+      (sum, d) => sum + (d['budget'] ?? 0.0),
+    );
+    final totalActual = chartData.fold<double>(
+      0.0,
+      (sum, d) => sum + (d['actual'] ?? 0.0),
+    );
     final difference = totalBudget - totalActual;
     final percentageUsed = totalBudget > 0 ? (totalActual / totalBudget * 100) : 0.0;
     
@@ -1209,6 +1217,12 @@ class _PremiumBudgetTimelineState extends State<PremiumBudgetTimeline>
   }
 
   Widget _buildMonthNavigator() {
+    final normalizedSelectedMonth = DateTime(
+      widget.selectedMonth.year,
+      widget.selectedMonth.month,
+      1,
+    );
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -1222,10 +1236,15 @@ class _PremiumBudgetTimelineState extends State<PremiumBudgetTimeline>
           // Previous Month Button
           IconButton(
             onPressed: () {
-              // Navigate to previous month
               widget.onPeriodChanged('monthly');
-              // Trigger parent to update selected month
-              if (mounted) setState(() {});
+
+              final previousMonth = DateTime(
+                normalizedSelectedMonth.year,
+                normalizedSelectedMonth.month - 1,
+                1,
+              );
+
+              widget.onMonthChanged?.call(previousMonth);
             },
             icon: Icon(Icons.chevron_left, color: Colors.grey[700]),
             tooltip: 'Previous Month',
@@ -1246,13 +1265,12 @@ class _PremiumBudgetTimelineState extends State<PremiumBudgetTimeline>
               ],
             ),
             child: DropdownButton<DateTime>(
-              value: widget.selectedMonth,
+              value: normalizedSelectedMonth,
               items: _buildMonthDropdownItems(),
               onChanged: (DateTime? newMonth) {
                 if (newMonth != null) {
                   widget.onPeriodChanged('monthly');
-                  // Trigger parent to update
-                  if (mounted) setState(() {});
+                  widget.onMonthChanged?.call(newMonth);
                 }
               },
               underline: const SizedBox(),
@@ -1266,9 +1284,10 @@ class _PremiumBudgetTimelineState extends State<PremiumBudgetTimeline>
               ),
               selectedItemBuilder: (context) {
                 return _buildMonthDropdownItems().map((item) {
+                  final safeValue = item.value ?? normalizedSelectedMonth;
                   return Center(
                     child: Text(
-                      DateFormat('MMMM yyyy').format(item.value!),
+                      DateFormat('MMMM yyyy').format(safeValue),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -1286,13 +1305,13 @@ class _PremiumBudgetTimelineState extends State<PremiumBudgetTimeline>
             onPressed: () {
               final now = DateTime.now();
               final nextMonth = DateTime(
-                widget.selectedMonth.year,
-                widget.selectedMonth.month + 1,
+                normalizedSelectedMonth.year,
+                normalizedSelectedMonth.month + 1,
               );
               // Don't allow future months beyond current month
               if (nextMonth.isBefore(DateTime(now.year, now.month + 1))) {
                 widget.onPeriodChanged('monthly');
-                if (mounted) setState(() {});
+                widget.onMonthChanged?.call(DateTime(nextMonth.year, nextMonth.month, 1));
               }
             },
             icon: Icon(Icons.chevron_right, color: Colors.grey[700]),
@@ -1305,11 +1324,11 @@ class _PremiumBudgetTimelineState extends State<PremiumBudgetTimeline>
 
   List<DropdownMenuItem<DateTime>> _buildMonthDropdownItems() {
     final List<DropdownMenuItem<DateTime>> items = [];
-    final now = DateTime.now();
+    final base = DateTime(widget.selectedMonth.year, widget.selectedMonth.month, 1);
     
     // Generate last 12 months
     for (int i = 0; i < 12; i++) {
-      final month = DateTime(now.year, now.month - i, 1);
+      final month = DateTime(base.year, base.month - i, 1);
       items.add(
         DropdownMenuItem(
           value: month,

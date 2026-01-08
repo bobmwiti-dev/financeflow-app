@@ -55,6 +55,30 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
     _searchController.dispose();
     super.dispose();
   }
+
+  BoxDecoration _premiumCardDecoration(ColorScheme colorScheme) {
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          colorScheme.surface,
+          colorScheme.surfaceContainerHighest,
+        ],
+      ),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(
+        color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: colorScheme.shadow.withValues(alpha: 0.08),
+          blurRadius: 28,
+          offset: const Offset(0, 16),
+        ),
+      ],
+    );
+  }
   
   // Helper method to handle navigation item selection
   void _onItemSelected(int index) {
@@ -137,7 +161,7 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('$category budget updated'),
-        backgroundColor: Colors.green,
+        backgroundColor: const Color(0xFF6366F1),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -221,57 +245,6 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
       margin: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Month Selector Row
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  colorScheme.surface,
-                  colorScheme.surfaceContainerHighest,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: colorScheme.shadow.withValues(alpha: 0.06),
-                  blurRadius: 20,
-                  offset: const Offset(0, 12),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF6366F1), Color(0xFF4F46E5)],
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.calendar_month, color: Colors.white, size: 18),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    DateFormat('MMMM yyyy').format(_currentSelectedMonth),
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[800],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
           // Search and Filter Row
           IntrinsicHeight(
             child: Row(
@@ -282,18 +255,7 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
                   flex: 2,
                   child: Container(
                     height: 48,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: colorScheme.shadow.withValues(alpha: 0.05),
-                          blurRadius: 14,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
+                    decoration: _premiumCardDecoration(colorScheme),
                     child: TextField(
                       controller: _searchController,
                       onChanged: (value) => setState(() => _searchQuery = value),
@@ -313,11 +275,7 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
                 Container(
                   height: 48,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
-                  ),
+                  decoration: _premiumCardDecoration(colorScheme),
                   child: DropdownButton<String>(
                     value: _selectedCategory,
                     items: _buildCategoryFilterItems(),
@@ -332,11 +290,7 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
                 Container(
                   width: 48,
                   height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
-                  ),
+                  decoration: _premiumCardDecoration(colorScheme),
                   child: IconButton(
                     onPressed: _showSortOptions,
                     icon: Icon(
@@ -449,15 +403,18 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF6366F1), Color(0xFF4F46E5)],
+              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -491,44 +448,57 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
         selectedIndex: _selectedIndex,
         onItemSelected: _onItemSelected,
       ),
-      body: Column(
-        children: [
-          // Enhanced Header with Search and Filters
-          _buildEnhancedHeader(),
-          Expanded(
-            child: Consumer<BudgetViewModel>(
-              builder: (context, viewModel, child) {
-                if (_isLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
-                }
-
-                final budgets = _getFilteredAndSortedBudgets(viewModel.budgets);
-                
-                return TabBarView(
-                  controller: _tabController,
-                  children: [
-                    // Enhanced Dashboard Tab
-                    _buildEnhancedDashboardTab(budgets, viewModel),
-                    
-                    // Timeline Tab
-                    _buildTimelineTab(budgets, viewModel),
-                    
-                    // Recommendations Tab
-                    _buildRecommendationsTab(budgets, viewModel),
-                  ],
-                );
-              },
-            ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              colorScheme.primary.withAlpha((0.06 * 255).toInt()),
+              theme.scaffoldBackgroundColor,
+              theme.scaffoldBackgroundColor,
+            ],
           ),
-        ],
+        ),
+        child: Column(
+          children: [
+            // Enhanced Header with Search and Filters
+            _buildEnhancedHeader(),
+            Expanded(
+              child: Consumer<BudgetViewModel>(
+                builder: (context, viewModel, child) {
+                  if (_isLoading) {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+
+                  final budgets = _getFilteredAndSortedBudgets(viewModel.budgets);
+                  
+                  return TabBarView(
+                    controller: _tabController,
+                    children: [
+                      // Enhanced Dashboard Tab
+                      _buildEnhancedDashboardTab(budgets, viewModel),
+                      
+                      // Timeline Tab
+                      _buildTimelineTab(budgets, viewModel),
+                      
+                      // Recommendations Tab
+                      _buildRecommendationsTab(budgets, viewModel),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
       floatingActionButton: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           gradient: const LinearGradient(
-            colors: [Color(0xFF6366F1), Color(0xFF4F46E5)],
+            colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -641,7 +611,7 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF6366F1), Color(0xFF4F46E5)],
+                      colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -689,12 +659,12 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
                 _buildEnhancedSummaryItem(
                   'Spent',
                   currencyFormat.format(totalSpent),
-                  Colors.orange,
+                  const Color(0xFF8B5CF6),
                 ),
                 _buildEnhancedSummaryItem(
                   'Remaining',
                   currencyFormat.format(remaining),
-                  Colors.green,
+                  const Color(0xFF6366F1),
                 ),
               ],
             ),
@@ -721,7 +691,7 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
                         fontWeight: FontWeight.bold,
                         color: percentUsed > 90 ? Colors.red : 
                                percentUsed > 75 ? Colors.orange : 
-                               Colors.green,
+                               const Color(0xFF6366F1),
                       ),
                     ),
                   ],
@@ -743,7 +713,7 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
                               ? [Colors.red.shade400, Colors.red.shade600]
                               : percentUsed > 75 
                                   ? [Colors.orange.shade400, Colors.orange.shade600]
-                                  : [Colors.green.shade400, Colors.green.shade600],
+                                  : [const Color(0xFF6366F1), const Color(0xFF8B5CF6)],
                         ),
                         borderRadius: BorderRadius.circular(6),
                       ),
@@ -784,6 +754,12 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
           selectedCategory: _selectedCategory,
           onCategoryChanged: _handleCategoryChange,
           selectedMonth: _currentSelectedMonth,
+          onMonthChanged: (newMonth) {
+            setState(() {
+              _currentSelectedMonth = DateTime(newMonth.year, newMonth.month, 1);
+            });
+            viewModel.loadBudgetsForMonth(_currentSelectedMonth);
+          },
         ).animate()
           .fadeIn(duration: const Duration(milliseconds: 600))
           .slideY(begin: 0.05, end: 0, duration: const Duration(milliseconds: 600));
@@ -1028,14 +1004,14 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
           itemCount: budgets.length,
           itemBuilder: (context, index) {
             final budget = budgets[index];
-            return _buildEnhancedBudgetCard(budget, index);
+            return _buildEnhancedBudgetCard(budget, index, viewModel);
           },
         ),
       ],
     );
   }
 
-  Widget _buildEnhancedBudgetCard(Budget budget, int index) {
+  Widget _buildEnhancedBudgetCard(Budget budget, int index, BudgetViewModel viewModel) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final currencyFormat = NumberFormat.currency(symbol: '\$');
@@ -1133,7 +1109,7 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
                               height: 8,
                               decoration: BoxDecoration(
                                 color: percentUsed > 100 ? Colors.red :
-                                       percentUsed > 80 ? Colors.orange : Colors.green,
+                                       percentUsed > 80 ? Colors.orange : const Color(0xFF6366F1),
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -1143,7 +1119,7 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 16,
-                                color: remaining >= 0 ? Colors.green : Colors.red,
+                                color: remaining >= 0 ? const Color(0xFF6366F1) : Colors.red,
                                 letterSpacing: -0.3,
                               ),
                             ),
@@ -1180,7 +1156,7 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
                               ? [Colors.red.shade400, Colors.red.shade600]
                               : percentUsed > 80 
                                   ? [Colors.orange.shade400, Colors.orange.shade600]
-                                  : [Colors.green.shade400, Colors.green.shade600],
+                                  : [const Color(0xFF6366F1), const Color(0xFF8B5CF6)],
                         ),
                         borderRadius: BorderRadius.circular(4),
                       ),
@@ -1323,7 +1299,7 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
       case 'entertainment':
         return Colors.purple;
       case 'utilities':
-        return Colors.green;
+        return const Color(0xFF8B5CF6);
       case 'healthcare':
         return Colors.red;
       default:
@@ -1355,29 +1331,7 @@ class _EnhancedBudgetManagementScreenState extends State<EnhancedBudgetManagemen
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.surface,
-            colorScheme.surfaceContainerHighest,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 12),
-            spreadRadius: 0,
-          ),
-        ],
-      ),
+      decoration: _premiumCardDecoration(colorScheme),
       child: Row(
         children: [
           Container(
