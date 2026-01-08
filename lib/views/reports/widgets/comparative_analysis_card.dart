@@ -30,6 +30,8 @@ class _ComparativeAnalysisCardState extends State<ComparativeAnalysisCard>
   late TabController _tabController;
   int _selectedMetric = 0; // 0: Expenses, 1: Income, 2: Savings
 
+  static const Color _accentColor = Color(0xFF6366F1);
+
   @override
   void initState() {
     super.initState();
@@ -62,11 +64,11 @@ class _ComparativeAnalysisCardState extends State<ComparativeAnalysisCard>
                 });
               },
               indicator: BoxDecoration(
-                color: AppTheme.primaryColor,
+                color: _accentColor,
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.3),
+                    color: _accentColor.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -180,7 +182,7 @@ class _ComparativeAnalysisCardState extends State<ComparativeAnalysisCard>
                 child: _buildComparisonItem(
                   'Current ${_getMetricName()}',
                   comparison.currentValue,
-                  AppTheme.primaryColor,
+                  _accentColor,
                   Icons.calendar_today,
                 ),
               ),
@@ -556,7 +558,7 @@ class _ComparativeAnalysisCardState extends State<ComparativeAnalysisCard>
                     height: 6,
                     margin: const EdgeInsets.only(top: 6, right: 8),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor,
+                      color: _accentColor,
                       shape: BoxShape.circle,
                     ),
                   ),
