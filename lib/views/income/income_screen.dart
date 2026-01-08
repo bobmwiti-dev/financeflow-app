@@ -37,7 +37,16 @@ class _IncomeScreenState extends State<IncomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadIncomeSources();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final incomeViewModel = Provider.of<IncomeViewModel>(context, listen: false);
+      incomeViewModel.setSelectedMonth(_selectedMonthNotifier.value);
+      if (incomeViewModel.incomeSources.isEmpty) {
+        _loadIncomeSources();
+      } else {
+        incomeViewModel.loadIncomeSources();
+      }
+    });
   }
 
   @override
@@ -45,6 +54,30 @@ class _IncomeScreenState extends State<IncomeScreen> {
     _selectedMonthNotifier.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  BoxDecoration _premiumCardDecoration(ColorScheme colorScheme) {
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          colorScheme.surface,
+          colorScheme.surfaceContainerHighest,
+        ],
+      ),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(
+        color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: colorScheme.shadow.withValues(alpha: 0.08),
+          blurRadius: 28,
+          offset: const Offset(0, 16),
+        ),
+      ],
+    );
   }
 
   Future<void> _loadIncomeSources() async {
@@ -97,15 +130,18 @@ class _IncomeScreenState extends State<IncomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF10B981), Color(0xFF059669)],
+              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -113,7 +149,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
         ),
         title: ShaderMask(
           shaderCallback: (bounds) => const LinearGradient(
-            colors: [Colors.white, Color(0xFFD1FAE5)],
+            colors: [Colors.white, Color(0xFFE0E7FF)],
           ).createShader(bounds),
           child: const Text(
             'Income',
@@ -127,24 +163,37 @@ class _IncomeScreenState extends State<IncomeScreen> {
         ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: Consumer<IncomeViewModel>(
-        builder: (context, viewModel, child) {
-          if (_isLoading) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          }
-
-          return Column(
-            children: [
-              // Enhanced Header with Search and Filters
-              _buildEnhancedHeader(viewModel),
-              Expanded(
-                child: _buildContent(viewModel),
-              ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              colorScheme.primary.withAlpha((0.06 * 255).toInt()),
+              theme.scaffoldBackgroundColor,
+              theme.scaffoldBackgroundColor,
             ],
-          );
-        },
+          ),
+        ),
+        child: Consumer<IncomeViewModel>(
+          builder: (context, viewModel, child) {
+            if (_isLoading && viewModel.incomeSources.isEmpty) {
+              return const Center(
+                child: CircularProgressIndicator(),
+              );
+            }
+
+            return Column(
+              children: [
+                // Enhanced Header with Search and Filters
+                _buildEnhancedHeader(viewModel),
+                Expanded(
+                  child: _buildContent(viewModel),
+                ),
+              ],
+            );
+          },
+        ),
       ),
       drawer: AppNavigationDrawer(
         selectedIndex: _selectedIndex,
@@ -154,19 +203,19 @@ class _IncomeScreenState extends State<IncomeScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           gradient: const LinearGradient(
-            colors: [Color(0xFF10B981), Color(0xFF059669)],
+            colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF10B981).withValues(alpha: 0.4),
+              color: const Color(0xFF6366F1).withValues(alpha: 0.4),
               blurRadius: 16,
               offset: const Offset(0, 8),
               spreadRadius: 0,
             ),
             BoxShadow(
-              color: const Color(0xFF10B981).withValues(alpha: 0.2),
+              color: const Color(0xFF6366F1).withValues(alpha: 0.2),
               blurRadius: 8,
               offset: const Offset(0, 4),
               spreadRadius: 0,
@@ -208,34 +257,14 @@ class _IncomeScreenState extends State<IncomeScreen> {
           // Month Selector Row
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  colorScheme.surface,
-                  colorScheme.surfaceContainerHighest,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: colorScheme.shadow.withValues(alpha: 0.06),
-                  blurRadius: 20,
-                  offset: const Offset(0, 12),
-                ),
-              ],
-            ),
+            decoration: _premiumCardDecoration(colorScheme),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF10B981), Color(0xFF059669)],
+                      colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
                     ),
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -258,7 +287,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
                         onChanged: (DateTime? newValue) {
                           if (newValue != null) {
                             _selectedMonthNotifier.value = newValue;
-                            _loadIncomeSources();
+                            viewModel.setSelectedMonth(newValue);
                           }
                         },
                         isExpanded: true,
@@ -286,18 +315,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
                   flex: 2,
                   child: Container(
                     height: 48,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: colorScheme.shadow.withValues(alpha: 0.05),
-                          blurRadius: 14,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
+                    decoration: _premiumCardDecoration(colorScheme),
                     child: TextField(
                       controller: _searchController,
                       onChanged: (value) => setState(() => _searchQuery = value),
@@ -317,11 +335,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
                 Container(
                   height: 48,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
-                  ),
+                  decoration: _premiumCardDecoration(colorScheme),
                   child: Builder(
                     builder: (context) {
                       final items = _buildTypeFilterItems(viewModel);
@@ -343,11 +357,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
                 Container(
                   width: 48,
                   height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
-                  ),
+                  decoration: _premiumCardDecoration(colorScheme),
                   child: IconButton(
                     onPressed: _showSortOptions,
                     icon: Icon(
@@ -538,45 +548,56 @@ class _IncomeScreenState extends State<IncomeScreen> {
       return _buildEmptyState();
     }
 
-    return SingleChildScrollView(
+    const headerItemCount = 6;
+    return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildEnhancedIncomeSummary(viewModel, filteredSources),
-            const SizedBox(height: 16),
-            _buildIncomeStats(filteredSources),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _selectedType == 'All' 
-                      ? 'All Income Sources' 
-                      : _selectedType == 'Recurring'
-                          ? 'Recurring Income'
-                          : '$_selectedType Income',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+      padding: const EdgeInsets.all(16.0),
+      itemCount: headerItemCount + filteredSources.length,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return _buildEnhancedIncomeSummary(viewModel, filteredSources);
+        }
+        if (index == 1) {
+          return const SizedBox(height: 16);
+        }
+        if (index == 2) {
+          return _buildIncomeStats(filteredSources);
+        }
+        if (index == 3) {
+          return const SizedBox(height: 16);
+        }
+        if (index == 4) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                _selectedType == 'All'
+                    ? 'All Income Sources'
+                    : _selectedType == 'Recurring'
+                        ? 'Recurring Income'
+                        : '$_selectedType Income',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
-                Text(
-                  '${filteredSources.length} ${filteredSources.length == 1 ? 'source' : 'sources'}',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 14,
-                  ),
+              ),
+              Text(
+                '${filteredSources.length} ${filteredSources.length == 1 ? 'source' : 'sources'}',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 14,
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ...filteredSources.map((source) => _buildEnhancedIncomeCard(source)),
-          ],
-        ),
-      ),
+              ),
+            ],
+          );
+        }
+        if (index == 5) {
+          return const SizedBox(height: 8);
+        }
+
+        final source = filteredSources[index - headerItemCount];
+        return RepaintBoundary(child: _buildEnhancedIncomeCard(source));
+      },
     );
   }
 
@@ -588,29 +609,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
       child: Container(
         margin: const EdgeInsets.all(32.0),
         padding: const EdgeInsets.all(40.0),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              colorScheme.surface,
-              colorScheme.surfaceContainerHighest,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: colorScheme.shadow.withValues(alpha: 0.08),
-              blurRadius: 24,
-              offset: const Offset(0, 14),
-              spreadRadius: 0,
-            ),
-          ],
-        ),
+        decoration: _premiumCardDecoration(colorScheme),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -619,8 +618,8 @@ class _IncomeScreenState extends State<IncomeScreen> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    const Color(0xFF10B981).withValues(alpha: 0.1),
-                    const Color(0xFF10B981).withValues(alpha: 0.05),
+                    const Color(0xFF6366F1).withValues(alpha: 0.10),
+                    const Color(0xFF8B5CF6).withValues(alpha: 0.06),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -630,7 +629,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
               child: const Icon(
                 Icons.account_balance_wallet_rounded,
                 size: 64,
-                color: Color(0xFF10B981),
+                color: Color(0xFF6366F1),
               ),
             ),
             const SizedBox(height: 24),
@@ -668,14 +667,14 @@ class _IncomeScreenState extends State<IncomeScreen> {
             Container(
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF10B981), Color(0xFF059669)],
+                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                    color: const Color(0xFF6366F1).withValues(alpha: 0.3),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -754,29 +753,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.surface,
-            colorScheme.surfaceContainerHighest,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 14),
-            spreadRadius: 0,
-          ),
-        ],
-      ),
+      decoration: _premiumCardDecoration(colorScheme),
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
@@ -788,14 +765,14 @@ class _IncomeScreenState extends State<IncomeScreen> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF10B981), Color(0xFF059669)],
+                      colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                        color: const Color(0xFF6366F1).withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -831,7 +808,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
                 _buildSummaryItem(
                   'Total Income',
                   totalIncome.toKenyaDualCurrency(),
-                  AppTheme.incomeColor,
+                  const Color(0xFF6366F1),
                 ),
                 _buildSummaryItem(
                   'Average',
@@ -1024,27 +1001,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.surface,
-            colorScheme.surfaceContainerHighest,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.06),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
+      decoration: _premiumCardDecoration(colorScheme),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
@@ -1052,7 +1009,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
             'This Month',
             '$thisMonth',
             Icons.calendar_today,
-            Colors.green,
+            const Color(0xFF6366F1),
           ),
           _buildStatItem(
             'Largest',
@@ -1144,29 +1101,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.surface,
-            colorScheme.surfaceContainerHighest,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-            spreadRadius: 0,
-          ),
-        ],
-      ),
+      decoration: _premiumCardDecoration(colorScheme),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -1182,7 +1117,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
               _loadIncomeSources();
             }
           },
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(24),
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Row(
@@ -1192,8 +1127,8 @@ class _IncomeScreenState extends State<IncomeScreen> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        const Color(0xFF10B981).withValues(alpha: 0.15),
-                        const Color(0xFF10B981).withValues(alpha: 0.08),
+                        const Color(0xFF6366F1).withValues(alpha: 0.15),
+                        const Color(0xFF8B5CF6).withValues(alpha: 0.08),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -1201,7 +1136,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                        color: const Color(0xFF6366F1).withValues(alpha: 0.2),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -1267,7 +1202,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
                           width: 8,
                           height: 8,
                           decoration: const BoxDecoration(
-                            color: Colors.green,
+                            color: Color(0xFF6366F1),
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -1277,7 +1212,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
                           style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 17,
-                            color: AppTheme.incomeColor,
+                            color: Color(0xFF6366F1),
                             letterSpacing: -0.3,
                           ),
                         ),
@@ -1327,7 +1262,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
                         const SizedBox(width: 4),
                         _buildQuickActionButton(
                           Icons.copy,
-                          Colors.green,
+                          const Color(0xFF6366F1),
                           () => _duplicateIncome(source),
                         ),
                         const SizedBox(width: 4),
@@ -1457,23 +1392,21 @@ class _IncomeScreenState extends State<IncomeScreen> {
   Color _getIncomeTypeColor(String type) {
     switch (type) {
       case 'Salary':
-        return Colors.blue;
+        return const Color(0xFF6366F1);
       case 'Side Hustle':
-        return Colors.purple;
+        return const Color(0xFF8B5CF6);
       case 'Loan':
         return Colors.orange;
       case 'Grant':
-        return Colors.teal;
-      case 'Family Contribution':
-        return Colors.pink;
-      case 'Business':
         return Colors.indigo;
+      case 'Business':
+        return Colors.deepPurple;
       case 'Dividend':
-        return Colors.green;
+        return const Color(0xFF8B5CF6);
       case 'Investment':
         return Colors.amber.shade700;
       case 'Gift':
-        return Colors.red;
+        return Colors.pink;
       default:
         return Colors.grey;
     }

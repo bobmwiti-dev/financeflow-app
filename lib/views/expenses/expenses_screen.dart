@@ -62,6 +62,30 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     super.dispose();
   }
 
+  BoxDecoration _premiumCardDecoration(ColorScheme colorScheme) {
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          colorScheme.surface,
+          colorScheme.surfaceContainerHighest,
+        ],
+      ),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(
+        color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: colorScheme.shadow.withValues(alpha: 0.08),
+          blurRadius: 28,
+          offset: const Offset(0, 16),
+        ),
+      ],
+    );
+  }
+
   bool _isDenseLayout(BuildContext context) {
     if (!kIsWeb) return false;
     final size = MediaQuery.of(context).size;
@@ -81,8 +105,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
@@ -111,30 +138,43 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: Consumer<TransactionViewModel>(
-        builder: (context, viewModel, child) {
-          // Use viewModel's loading state instead of local loading state
-          if (viewModel.isLoading && viewModel.transactions.isEmpty) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          }
-
-          return Column(
-            children: [
-              // Enhanced Header with Search and Filters
-              _buildEnhancedHeader(viewModel),
-              Expanded(
-                child: ValueListenableBuilder<DateTime>(
-                  valueListenable: _selectedMonthNotifier,
-                  builder: (context, selectedMonth, child) {
-                    return _buildContent(viewModel, selectedMonth);
-                  },
-                ),
-              ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              colorScheme.primary.withAlpha((0.06 * 255).toInt()),
+              theme.scaffoldBackgroundColor,
+              theme.scaffoldBackgroundColor,
             ],
-          );
-        },
+          ),
+        ),
+        child: Consumer<TransactionViewModel>(
+          builder: (context, viewModel, child) {
+            // Use viewModel's loading state instead of local loading state
+            if (viewModel.isLoading && viewModel.transactions.isEmpty) {
+              return const Center(
+                child: CircularProgressIndicator(),
+              );
+            }
+
+            return Column(
+              children: [
+                // Enhanced Header with Search and Filters
+                _buildEnhancedHeader(viewModel),
+                Expanded(
+                  child: ValueListenableBuilder<DateTime>(
+                    valueListenable: _selectedMonthNotifier,
+                    builder: (context, selectedMonth, child) {
+                      return _buildContent(viewModel, selectedMonth);
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
       drawer: AppNavigationDrawer(
         selectedIndex: _selectedIndex,
@@ -168,7 +208,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             await Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const AddTransactionScreen(),
+                builder: (context) => const AddTransactionScreen(expenseOnly: true),
               ),
             );
           },
@@ -272,22 +312,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           // Month Selector Row
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Colors.white, Color(0xFFFDFDFD)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.withValues(alpha: 0.08)),
-              boxShadow: [
-                BoxShadow(
-                  color: colorScheme.shadow.withValues(alpha: 0.06),
-                  blurRadius: 18,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
+            decoration: _premiumCardDecoration(colorScheme),
             child: Row(
               children: [
                 Container(
@@ -346,18 +371,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               Expanded(
                 flex: 2,
                 child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: colorScheme.shadow.withValues(alpha: 0.05),
-                        blurRadius: 14,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
+                  decoration: _premiumCardDecoration(colorScheme),
                   child: TextField(
                     controller: _searchController,
                     onChanged: (value) => setState(() => _searchQuery = value),
@@ -376,11 +390,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               // Category Filter
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
-                ),
+                decoration: _premiumCardDecoration(colorScheme),
                 child: Builder(
                   builder: (context) {
                     final items = _buildCategoryFilterItems(viewModel);
@@ -400,19 +410,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               const SizedBox(width: 8),
               // Sort Button
               Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
-                ),
+                decoration: _premiumCardDecoration(colorScheme),
                 child: IconButton(
                   onPressed: _showSortOptions,
-                  icon: Icon(
-                    _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
-                    size: 18,
-                    color: Colors.grey[600],
-                  ),
-                  tooltip: 'Sort by $_sortBy',
+                  icon: Icon(Icons.sort, color: Colors.grey[600]),
                 ),
               ),
             ],
@@ -666,18 +667,36 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       return _buildEmptyState(selectedMonth);
     }
 
-    return ListView(
+    const headerItemCount = 6;
+    return ListView.builder(
       padding: EdgeInsets.symmetric(
         horizontal: 16.0,
         vertical: isDense ? 8.0 : 16.0,
       ),
-      children: [
-        _buildEnhancedExpenseSummary(viewModel, selectedMonth, expenses),
-        SizedBox(height: isDense ? 10 : 16),
-        _buildExpenseStats(expenses),
-        SizedBox(height: isDense ? 10 : 16),
-        ...expenses.map((expense) => _buildEnhancedExpenseCard(expense)),
-      ],
+      itemCount: headerItemCount + expenses.length,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return _buildEnhancedExpenseSummary(viewModel, selectedMonth, expenses);
+        }
+        if (index == 1) {
+          return SizedBox(height: isDense ? 10 : 16);
+        }
+        if (index == 2) {
+          return _buildExpenseStats(expenses);
+        }
+        if (index == 3) {
+          return SizedBox(height: isDense ? 10 : 16);
+        }
+        if (index == 4) {
+          return const SizedBox.shrink();
+        }
+        if (index == 5) {
+          return const SizedBox.shrink();
+        }
+
+        final expense = expenses[index - headerItemCount];
+        return RepaintBoundary(child: _buildEnhancedExpenseCard(expense));
+      },
     );
   }
 
@@ -784,7 +803,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const AddTransactionScreen(),
+                      builder: (context) => const AddTransactionScreen(expenseOnly: true),
                     ),
                   );
                 },
@@ -983,17 +1002,17 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 _buildSummaryItem(
                   'Total Expenses',
                   totalExpenses.toCurrency(),
-                  AppTheme.expenseColor,
+                  const Color(0xFF6366F1),
                 ),
                 _buildSummaryItem(
                   'Average',
                   averageExpense.toCurrency(),
-                  Colors.blue,
+                  const Color(0xFF8B5CF6),
                 ),
                 _buildSummaryItem(
                   'Count',
                   '${expenses.length}',
-                  AppTheme.primaryColor,
+                  const Color(0xFF6366F1),
                 ),
               ],
             ),
@@ -1191,27 +1210,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.surface,
-            colorScheme.surfaceContainerHighest,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.06),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
+      decoration: _premiumCardDecoration(colorScheme),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
@@ -1219,7 +1218,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             'This Week',
             '$thisWeek',
             Icons.calendar_today,
-            Colors.blue,
+            const Color(0xFF6366F1),
             onTap: () {
               setState(() {
                 _showOnlyThisWeek = !_showOnlyThisWeek;
@@ -1231,7 +1230,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             'Largest',
             largestExpense.amount.abs().toCurrency(),
             Icons.trending_up,
-            Colors.red,
+            const Color(0xFF8B5CF6),
             onTap: () {
               setState(() {
                 _sortBy = 'amount';
@@ -1243,7 +1242,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             'Categories',
             '${expenses.map((e) => e.category).toSet().length}',
             Icons.category,
-            Colors.green,
+            const Color(0xFF6366F1),
             onTap: () {
               setState(() {
                 _selectedCategory = 'All';
@@ -1321,29 +1320,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         horizontal: 20,
         vertical: isDense ? 4 : 6,
       ),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.surface,
-            colorScheme.surfaceContainerHighest,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-            spreadRadius: 0,
-          ),
-        ],
-      ),
+      decoration: _premiumCardDecoration(colorScheme),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -1358,7 +1335,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               ),
             );
           },
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(24),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
@@ -1418,10 +1395,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                           height: 6,
                           decoration: BoxDecoration(
                             color: expense.status == TransactionStatus.completed 
-                                ? Colors.green 
+                                ? const Color(0xFF6366F1)
                                 : expense.status == TransactionStatus.pending
-                                    ? Colors.orange
-                                    : Colors.red,
+                                    ? const Color(0xFF8B5CF6)
+                                    : Colors.deepPurple,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -1431,7 +1408,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                           style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 16,
-                            color: AppTheme.expenseColor,
+                            color: Color(0xFF6366F1),
                             letterSpacing: -0.3,
                           ),
                         ),
@@ -1475,13 +1452,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       children: [
                         _buildQuickActionButton(
                           Icons.edit,
-                          Colors.blue,
+                          const Color(0xFF6366F1),
                           () => _editExpense(expense),
                         ),
                         const SizedBox(width: 3),
                         _buildQuickActionButton(
                           Icons.copy,
-                          Colors.green,
+                          const Color(0xFF8B5CF6),
                           () => _duplicateExpense(expense),
                         ),
                         const SizedBox(width: 3),

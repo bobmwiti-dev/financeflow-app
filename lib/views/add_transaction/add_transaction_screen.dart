@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../models/transaction_model.dart' as models;
@@ -9,10 +8,14 @@ import '../../widgets/account_selector_widget.dart';
 
 class AddTransactionScreen extends StatefulWidget {
   final models.Transaction? transaction;
+  final bool expenseOnly;
+  final bool? initialIsExpense;
 
   const AddTransactionScreen({
     super.key,
     this.transaction,
+    this.expenseOnly = false,
+    this.initialIsExpense,
   });
 
   @override
@@ -32,6 +35,32 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   bool _isExpense = true;
   bool _isLoading = false;
   String? _selectedAccountId;
+
+  bool get _isTypeLocked => widget.expenseOnly && widget.transaction == null;
+
+  BoxDecoration _premiumCardDecoration(ColorScheme colorScheme) {
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          colorScheme.surface,
+          colorScheme.surfaceContainerHighest,
+        ],
+      ),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(
+        color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: colorScheme.shadow.withValues(alpha: 0.08),
+          blurRadius: 28,
+          offset: const Offset(0, 16),
+        ),
+      ],
+    );
+  }
   
   final List<String> _categories = [
     'Food',
@@ -64,6 +93,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _selectedDate = widget.transaction!.date;
       _selectedCategory = widget.transaction!.category;
       _isExpense = widget.transaction!.isExpense;
+    } else {
+      if (widget.initialIsExpense != null) {
+        _isExpense = widget.initialIsExpense!;
+      }
+    }
+
+    if (_isTypeLocked) {
+      _isExpense = true;
     }
   }
 
@@ -151,140 +188,264 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isEditing = widget.transaction != null;
+    final title = _isTypeLocked
+        ? (isEditing ? 'Edit Expense' : 'Add Expense')
+        : (isEditing
+            ? (_isExpense ? 'Edit Expense' : 'Edit Income')
+            : (_isExpense ? 'Add Expense' : 'Add Income'));
+
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(widget.transaction != null ? 'Edit Transaction' : 'Add Transaction'),
-        backgroundColor: Theme.of(context).primaryColor,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: _isExpense
+                  ? const [Color(0xFF6366F1), Color(0xFF8B5CF6)]
+                  : [Colors.green.shade600, Colors.teal.shade500],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.2,
+          ),
+        ),
         foregroundColor: Colors.white,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildTransactionTypeSelector(),
-                    const SizedBox(height: 24),
-                    AccountSelectorWidget(
-                      selectedAccountId: _selectedAccountId,
-                      onAccountSelected: (accountId) {
-                        setState(() {
-                          _selectedAccountId = accountId;
-                        });
-                      },
-                      label: 'Account',
-                      isRequired: true,
-                      hintText: 'Choose account for this transaction',
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTitleField(),
-                    const SizedBox(height: 16),
-                    _buildAmountField(),
-                    const SizedBox(height: 16),
-                    _buildDateField(),
-                    const SizedBox(height: 16),
-                    _buildCategorySelector(),
-                    const SizedBox(height: 16),
-                    _buildNotesField(),
-                    const SizedBox(height: 32),
-                    _buildSubmitButton(),
+          : Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    colorScheme.primary.withAlpha((0.06 * 255).toInt()),
+                    theme.scaffoldBackgroundColor,
+                    theme.scaffoldBackgroundColor,
                   ],
-                ).animate().fadeIn(duration: const Duration(milliseconds: 300)),
+                ),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Form(
+                  key: _formKey,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          decoration: _premiumCardDecoration(colorScheme),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: _buildTransactionTypeSelector(theme, colorScheme),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          decoration: _premiumCardDecoration(colorScheme),
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            children: [
+                              AccountSelectorWidget(
+                                selectedAccountId: _selectedAccountId,
+                                onAccountSelected: (accountId) {
+                                  setState(() {
+                                    _selectedAccountId = accountId;
+                                  });
+                                },
+                                label: 'Account',
+                                isRequired: true,
+                                hintText: 'Choose account for this transaction',
+                              ),
+                              const SizedBox(height: 12),
+                              _buildTitleField(theme, colorScheme),
+                              const SizedBox(height: 12),
+                              _buildAmountField(theme, colorScheme),
+                              const SizedBox(height: 12),
+                              _buildDateField(theme, colorScheme),
+                              const SizedBox(height: 12),
+                              _buildCategorySelector(theme, colorScheme),
+                              const SizedBox(height: 12),
+                              _buildNotesField(theme, colorScheme),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+      bottomNavigationBar: _isLoading
+          ? null
+          : SafeArea(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: colorScheme.surface,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 22,
+                      offset: const Offset(0, -10),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(16),
+                child: _buildSubmitButton(theme, colorScheme),
               ),
             ),
     );
   }
 
-  Widget _buildTransactionTypeSelector() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
+  Widget _buildTransactionTypeSelector(ThemeData theme, ColorScheme colorScheme) {
+    if (_isTypeLocked) {
+      return Row(
         children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _isExpense = true),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  color: _isExpense 
-                      ? Colors.red.withValues(alpha: 0.1) 
-                      : Colors.transparent,
-                  borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.arrow_downward,
-                      color: _isExpense ? Colors.red : Colors.grey,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Expense',
-                      style: TextStyle(
-                        color: _isExpense ? Colors.red : Colors.grey,
-                        fontWeight: _isExpense ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: colorScheme.errorContainer.withValues(alpha: 0.7),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              Icons.arrow_downward,
+              color: colorScheme.onErrorContainer,
             ),
           ),
+          const SizedBox(width: 12),
           Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _isExpense = false),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  color: !_isExpense 
-                      ? Colors.green.withValues(alpha: 0.1) 
-                      : Colors.transparent,
-                  borderRadius: const BorderRadius.horizontal(right: Radius.circular(12)),
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.arrow_upward,
-                      color: !_isExpense ? Colors.green : Colors.grey,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Income',
-                      style: TextStyle(
-                        color: !_isExpense ? Colors.green : Colors.grey,
-                        fontWeight: !_isExpense ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                  ],
-                ),
+            child: Text(
+              'Expense',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
         ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () => _setTransactionType(true),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: _isExpense
+                    ? colorScheme.errorContainer.withValues(alpha: 0.35)
+                    : Colors.transparent,
+                borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.arrow_downward,
+                    color: _isExpense ? colorScheme.error : colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Expense',
+                    style: TextStyle(
+                      color: _isExpense ? colorScheme.error : colorScheme.onSurfaceVariant,
+                      fontWeight: _isExpense ? FontWeight.w700 : FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Container(
+          width: 1,
+          height: 44,
+          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+        ),
+        Expanded(
+          child: GestureDetector(
+            onTap: () => _setTransactionType(false),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: !_isExpense
+                    ? colorScheme.secondaryContainer.withValues(alpha: 0.5)
+                    : Colors.transparent,
+                borderRadius: const BorderRadius.horizontal(right: Radius.circular(16)),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.arrow_upward,
+                    color: !_isExpense ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Income',
+                    style: TextStyle(
+                      color: !_isExpense ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                      fontWeight: !_isExpense ? FontWeight.w700 : FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  InputDecoration _fieldDecoration(
+    ThemeData theme,
+    ColorScheme colorScheme, {
+    required String labelText,
+    required IconData icon,
+    String? hintText,
+  }) {
+    final baseBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.8)),
+    );
+    return InputDecoration(
+      labelText: labelText,
+      hintText: hintText,
+      prefixIcon: Icon(icon),
+      filled: true,
+      fillColor: colorScheme.surface,
+      border: baseBorder,
+      enabledBorder: baseBorder,
+      focusedBorder: baseBorder.copyWith(
+        borderSide: BorderSide(color: colorScheme.primary, width: 1.6),
       ),
     );
   }
 
-  Widget _buildTitleField() {
+  Widget _buildTitleField(ThemeData theme, ColorScheme colorScheme) {
     return TextFormField(
       controller: _titleController,
-      decoration: const InputDecoration(
+      textInputAction: TextInputAction.next,
+      decoration: _fieldDecoration(
+        theme,
+        colorScheme,
         labelText: 'Title',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.title),
+        hintText: 'e.g. Lunch, Uber, Rent',
+        icon: Icons.title,
       ),
       validator: (value) {
         if (value == null || value.isEmpty) {
@@ -295,13 +456,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
-  Widget _buildAmountField() {
+  Widget _buildAmountField(ThemeData theme, ColorScheme colorScheme) {
     return TextFormField(
       controller: _amountController,
-      decoration: const InputDecoration(
+      textInputAction: TextInputAction.next,
+      decoration: _fieldDecoration(
+        theme,
+        colorScheme,
         labelText: 'Amount',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.attach_money),
+        hintText: '0.00',
+        icon: Icons.attach_money,
       ),
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       validator: (value) {
@@ -316,14 +480,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
-  Widget _buildDateField() {
+  Widget _buildDateField(ThemeData theme, ColorScheme colorScheme) {
     return InkWell(
       onTap: () => _selectDate(context),
       child: InputDecorator(
-        decoration: const InputDecoration(
+        decoration: _fieldDecoration(
+          theme,
+          colorScheme,
           labelText: 'Date',
-          border: OutlineInputBorder(),
-          prefixIcon: Icon(Icons.calendar_today),
+          icon: Icons.calendar_today,
         ),
         child: Text(
           DateFormat('MMMM d, yyyy').format(_selectedDate),
@@ -332,15 +497,37 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
-  Widget _buildCategorySelector() {
+  List<String> _categoriesForSelectedType() {
+    if (_isExpense) {
+      return _categories
+          .where((c) => c != 'Income' && c != 'Savings' && c != 'Investments')
+          .toList();
+    }
+    return _categories;
+  }
+
+  void _setTransactionType(bool isExpense) {
+    setState(() {
+      _isExpense = isExpense;
+      final categories = _categoriesForSelectedType();
+      if (!categories.contains(_selectedCategory)) {
+        _selectedCategory = categories.first;
+      }
+    });
+  }
+
+  Widget _buildCategorySelector(ThemeData theme, ColorScheme colorScheme) {
+    final categories = _categoriesForSelectedType();
+    final selectedValue = categories.contains(_selectedCategory) ? _selectedCategory : categories.first;
     return DropdownButtonFormField<String>(
-      value: _selectedCategory,
-      decoration: const InputDecoration(
+      value: selectedValue,
+      decoration: _fieldDecoration(
+        theme,
+        colorScheme,
         labelText: 'Category',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.category),
+        icon: Icons.category,
       ),
-      items: _categories.map((category) {
+      items: categories.map((category) {
         return DropdownMenuItem<String>(
           value: category,
           child: Text(category),
@@ -362,34 +549,69 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
-  Widget _buildNotesField() {
+  Widget _buildNotesField(ThemeData theme, ColorScheme colorScheme) {
     return TextFormField(
       controller: _notesController,
-      decoration: const InputDecoration(
+      minLines: 1,
+      maxLines: 4,
+      decoration: _fieldDecoration(
+        theme,
+        colorScheme,
         labelText: 'Notes (Optional)',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.note),
+        hintText: 'Add a note for this transaction',
+        icon: Icons.note,
       ),
-      maxLines: 3,
     );
   }
 
-  Widget _buildSubmitButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton(
-        onPressed: _saveTransaction,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Theme.of(context).primaryColor,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+  Widget _buildSubmitButton(ThemeData theme, ColorScheme colorScheme) {
+    final isEditing = widget.transaction != null;
+    final label = _isTypeLocked
+        ? (isEditing ? 'Update Expense' : 'Add Expense')
+        : (isEditing
+            ? (_isExpense ? 'Update Expense' : 'Update Income')
+            : (_isExpense ? 'Add Expense' : 'Add Income'));
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: _isExpense
+              ? const [Color(0xFF6366F1), Color(0xFF8B5CF6)]
+              : [Colors.green.shade600, Colors.teal.shade500],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: Text(
-          widget.transaction != null ? 'Update Transaction' : 'Add Transaction',
-          style: const TextStyle(fontSize: 16),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: (_isExpense ? const Color(0xFF6366F1) : Colors.green)
+                .withValues(alpha: 0.28),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        height: 54,
+        child: ElevatedButton(
+          onPressed: _saveTransaction,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          child: Text(
+            label,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              letterSpacing: 0.2,
+            ),
+          ),
         ),
       ),
     );

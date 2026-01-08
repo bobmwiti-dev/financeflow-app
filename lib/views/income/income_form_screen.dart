@@ -60,6 +60,59 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
     super.dispose();
   }
 
+  BoxDecoration _premiumCardDecoration(ColorScheme colorScheme) {
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          colorScheme.surface,
+          colorScheme.surfaceContainerHighest,
+        ],
+      ),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(
+        color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: colorScheme.shadow.withValues(alpha: 0.08),
+          blurRadius: 28,
+          offset: const Offset(0, 16),
+        ),
+      ],
+    );
+  }
+
+  InputDecoration _fieldDecoration(
+    ThemeData theme,
+    ColorScheme colorScheme, {
+    required String labelText,
+    required IconData icon,
+    String? hintText,
+    String? prefixText,
+    bool alignLabelWithHint = false,
+  }) {
+    final baseBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.8)),
+    );
+    return InputDecoration(
+      labelText: labelText,
+      hintText: hintText,
+      prefixText: prefixText,
+      prefixIcon: Icon(icon),
+      filled: true,
+      fillColor: colorScheme.surface,
+      alignLabelWithHint: alignLabelWithHint,
+      border: baseBorder,
+      enabledBorder: baseBorder,
+      focusedBorder: baseBorder.copyWith(
+        borderSide: BorderSide(color: colorScheme.primary, width: 1.6),
+      ),
+    );
+  }
+
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -164,10 +217,32 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
   Widget build(BuildContext context) {
     final isEditing = widget.incomeSource != null;
     final title = isEditing ? 'Edit Income Source' : 'Add Income Source';
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(title),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.2,
+          ),
+        ),
+        foregroundColor: Colors.white,
         actions: [
           if (isEditing)
             IconButton(
@@ -180,57 +255,94 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AccountSelectorWidget(
-                      selectedAccountId: _selectedAccountId,
-                      onAccountSelected: (accountId) {
-                        setState(() {
-                          _selectedAccountId = accountId;
-                        });
-                      },
-                      label: 'Account',
-                      isRequired: true,
-                      hintText: 'Choose account for this income',
-                    ),
-                    const SizedBox(height: 16),
-                    _buildNameField(),
-                    const SizedBox(height: 16),
-                    _buildTypeDropdown(),
-                    const SizedBox(height: 16),
-                    _buildAmountField(),
-                    const SizedBox(height: 16),
-                    _buildDatePicker(),
-                    const SizedBox(height: 16),
-                    _buildRecurringToggle(),
-                    if (_isRecurring) ...[
-                      const SizedBox(height: 16),
-                      _buildFrequencyDropdown(),
-                    ],
-                    const SizedBox(height: 16),
-                    _buildNotesField(),
-                    const SizedBox(height: 24),
-                    _buildSaveButton(),
+          : Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    colorScheme.primary.withAlpha((0.06 * 255).toInt()),
+                    theme.scaffoldBackgroundColor,
+                    theme.scaffoldBackgroundColor,
                   ],
                 ),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Form(
+                  key: _formKey,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+                    child: Container(
+                      decoration: _premiumCardDecoration(colorScheme),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AccountSelectorWidget(
+                            selectedAccountId: _selectedAccountId,
+                            onAccountSelected: (accountId) {
+                              setState(() {
+                                _selectedAccountId = accountId;
+                              });
+                            },
+                            label: 'Account',
+                            isRequired: true,
+                            hintText: 'Choose account for this income',
+                          ),
+                          const SizedBox(height: 12),
+                          _buildNameField(theme, colorScheme),
+                          const SizedBox(height: 12),
+                          _buildTypeDropdown(theme, colorScheme),
+                          const SizedBox(height: 12),
+                          _buildAmountField(theme, colorScheme),
+                          const SizedBox(height: 12),
+                          _buildDatePicker(theme, colorScheme),
+                          const SizedBox(height: 12),
+                          _buildRecurringToggle(theme, colorScheme),
+                          if (_isRecurring) ...[
+                            const SizedBox(height: 12),
+                            _buildFrequencyDropdown(theme, colorScheme),
+                          ],
+                          const SizedBox(height: 12),
+                          _buildNotesField(theme, colorScheme),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+      bottomNavigationBar: _isLoading
+          ? null
+          : SafeArea(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: colorScheme.surface,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 22,
+                      offset: const Offset(0, -10),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(16),
+                child: _buildSaveButton(),
               ),
             ),
     );
   }
 
-  Widget _buildNameField() {
+  Widget _buildNameField(ThemeData theme, ColorScheme colorScheme) {
     return TextFormField(
       controller: _nameController,
-      decoration: const InputDecoration(
+      decoration: _fieldDecoration(
+        theme,
+        colorScheme,
         labelText: 'Income Source Name',
         hintText: 'E.g., Monthly Salary, Freelance Project',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.label),
+        icon: Icons.label,
       ),
       validator: (value) {
         if (value == null || value.isEmpty) {
@@ -241,7 +353,7 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
     );
   }
 
-  Widget _buildTypeDropdown() {
+  Widget _buildTypeDropdown(ThemeData theme, ColorScheme colorScheme) {
     // Ensure selected type exists in the list
     if (!AppConstants.incomeSourceTypes.contains(_selectedType)) {
       _selectedType = AppConstants.incomeSourceTypes.first;
@@ -249,10 +361,11 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
     
     return DropdownButtonFormField<String>(
       value: _selectedType,
-      decoration: const InputDecoration(
+      decoration: _fieldDecoration(
+        theme,
+        colorScheme,
         labelText: 'Income Type',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.category),
+        icon: Icons.category,
       ),
       items: AppConstants.incomeSourceTypes.map((type) {
         return DropdownMenuItem<String>(
@@ -276,15 +389,16 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
     );
   }
 
-  Widget _buildAmountField() {
+  Widget _buildAmountField(ThemeData theme, ColorScheme colorScheme) {
     return TextFormField(
       controller: _amountController,
       keyboardType: TextInputType.number,
-      decoration: const InputDecoration(
+      decoration: _fieldDecoration(
+        theme,
+        colorScheme,
         labelText: 'Amount',
         hintText: 'E.g., 1500.00',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.attach_money),
+        icon: Icons.attach_money,
         prefixText: '\$ ',
       ),
       validator: (value) {
@@ -304,23 +418,24 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
     );
   }
 
-  Widget _buildDatePicker() {
+  Widget _buildDatePicker(ThemeData theme, ColorScheme colorScheme) {
     final dateFormat = DateFormat(AppConstants.dateFormat);
     
     return InkWell(
       onTap: () => _selectDate(context),
       child: InputDecorator(
-        decoration: const InputDecoration(
+        decoration: _fieldDecoration(
+          theme,
+          colorScheme,
           labelText: 'Date Received',
-          border: OutlineInputBorder(),
-          prefixIcon: Icon(Icons.calendar_today),
+          icon: Icons.calendar_today,
         ),
         child: Text(dateFormat.format(_date)),
       ),
     );
   }
 
-  Widget _buildRecurringToggle() {
+  Widget _buildRecurringToggle(ThemeData theme, ColorScheme colorScheme) {
     return SwitchListTile(
       title: const Text('Recurring Income'),
       subtitle: Text(
@@ -332,11 +447,7 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
       ),
       value: _isRecurring,
       activeColor: AppTheme.primaryColor,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: Colors.grey.shade300),
-      ),
+      contentPadding: EdgeInsets.zero,
       onChanged: (value) {
         setState(() {
           _isRecurring = value;
@@ -345,7 +456,7 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
     );
   }
 
-  Widget _buildFrequencyDropdown() {
+  Widget _buildFrequencyDropdown(ThemeData theme, ColorScheme colorScheme) {
     // Ensure selected frequency exists in the list
     if (!AppConstants.frequencyOptions.contains(_frequency)) {
       _frequency = AppConstants.frequencyOptions.first;
@@ -353,10 +464,11 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
     
     return DropdownButtonFormField<String>(
       value: _frequency,
-      decoration: const InputDecoration(
+      decoration: _fieldDecoration(
+        theme,
+        colorScheme,
         labelText: 'Frequency',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.repeat),
+        icon: Icons.repeat,
       ),
       items: AppConstants.frequencyOptions.map((frequency) {
         return DropdownMenuItem<String>(
@@ -374,35 +486,60 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
     );
   }
 
-  Widget _buildNotesField() {
+  Widget _buildNotesField(ThemeData theme, ColorScheme colorScheme) {
     return TextFormField(
       controller: _notesController,
       maxLines: 3,
-      decoration: const InputDecoration(
+      decoration: _fieldDecoration(
+        theme,
+        colorScheme,
         labelText: 'Notes (Optional)',
         hintText: 'Add any additional details about this income source',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.note),
+        icon: Icons.note,
         alignLabelWithHint: true,
       ),
     );
   }
 
   Widget _buildSaveButton() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return SizedBox(
       width: double.infinity,
       height: 50,
-      child: ElevatedButton(
-        onPressed: _saveIncomeSource,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.incomeColor,
-          foregroundColor: Colors.white,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: colorScheme.shadow.withValues(alpha: 0.18),
+              blurRadius: 14,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
-        child: Text(
-          widget.incomeSource != null ? 'Update Income Source' : 'Add Income Source',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+        child: ElevatedButton(
+          onPressed: _saveIncomeSource,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          child: Text(
+            widget.incomeSource != null ? 'Update Income Source' : 'Add Income Source',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),
