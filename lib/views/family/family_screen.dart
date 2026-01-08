@@ -634,19 +634,19 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
             children: [
               Expanded(
                 child: _buildQuickActionButton(
-                  'Add Member',
-                  Icons.person_add,
-                  AppTheme.primaryColor,
-                  () => _showAddFamilyMemberDialog(context),
+                  label: 'Add Member',
+                  icon: Icons.person_add,
+                  color: AppTheme.primaryColor,
+                  onPressed: () => _showAddFamilyMemberDialog(context),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _buildQuickActionButton(
-                  'View Requests',
-                  Icons.request_quote,
-                  Colors.indigo,
-                  () {
+                  label: 'View Requests',
+                  icon: Icons.request_quote,
+                  color: Colors.indigo,
+                  onPressed: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -669,12 +669,12 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
       .slideY(begin: 0.3, duration: 600.ms);
   }
 
-  Widget _buildQuickActionButton(
-    String label,
-    IconData icon,
-    Color color,
-    VoidCallback onPressed,
-  ) {
+  Widget _buildQuickActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -711,42 +711,6 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildEnhancedFamilyMemberList(BuildContext context, FamilyViewModel viewModel) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Text(
-              'Family Members',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                '${viewModel.familyMembers.length} members',
-                style: TextStyle(
-                  color: AppTheme.primaryColor,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-      ],
     );
   }
 
