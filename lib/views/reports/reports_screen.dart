@@ -40,6 +40,15 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
   int _selectedIndex = 3; // Reports tab selected
   DateTime _selectedMonth = DateTime.now(); // Keep for backward compatibility
 
+  LinearGradient get _accentGradient => const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color(0xFF6366F1),
+          Color(0xFF8B5CF6),
+        ],
+      );
+
   // Month selection notifier (first day of the month)
   final ValueNotifier<DateTime> _selectedMonthNotifier = ValueNotifier(
     DateTime(DateTime.now().year, DateTime.now().month, 1),
@@ -173,6 +182,7 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     if (widget.focusExpenseOptimization && !_hasScrolledToExpenseOptimization) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollToExpenseOptimization();
@@ -180,11 +190,30 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
     }
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('Reports'),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(gradient: _accentGradient),
+        ),
+        title: ShaderMask(
+          shaderCallback: (bounds) => const LinearGradient(
+            colors: [Colors.white, Colors.white70],
+          ).createShader(bounds),
+          child: const Text(
+            'Reports',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
+            color: Colors.white,
             onPressed: () {
               // Manually refresh all transactions
               final viewModel = Provider.of<TransactionViewModel>(context, listen: false);
@@ -204,6 +233,7 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
           ),
           IconButton(
             icon: const Icon(Icons.share),
+            color: Colors.white,
             onPressed: () {
               // Share reports
             },
@@ -214,86 +244,98 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
         selectedIndex: _selectedIndex,
         onItemSelected: _onItemSelected,
       ),
-      body: SingleChildScrollView(
-        controller: _scrollController,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Enhanced Period Selector
-              AdvancedPeriodSelector(
-                selectedPeriod: TimePeriod.currentMonth(),
-                onPeriodChanged: _onTimePeriodChanged,
-                showComparison: true,
-              ),
-              const SizedBox(height: 16),
-              
-              // Quick Action Items Card (New)
-              QuickActionItemsCard(
-                selectedPeriod: TimePeriod.currentMonth(),
-              ),
-              const SizedBox(height: 16),
-              
-              // Cross-Screen Navigation Hub (New)
-              const CrossScreenNavigationHubCard(),
-              const SizedBox(height: 16),
-              
-              // Smart Anomaly Detection Card (New)
-              SmartAnomalyCard(
-                selectedPeriod: TimePeriod.currentMonth(),
-              ),
-              const SizedBox(height: 16),
-              
-              // Comparative Analysis Card (New)
-              Consumer2<TransactionViewModel, IncomeViewModel>(
-                builder: (context, transactionViewModel, incomeViewModel, _) {
-                  return ComparativeAnalysisCard(
-                    selectedPeriod: TimePeriod.currentMonth(),
-                    allTransactions: transactionViewModel.allTransactions,
-                    allIncomeSources: incomeViewModel.incomeSources,
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
-              
-              // Kenya-Specific Insights Card (New)
-              Consumer2<TransactionViewModel, IncomeViewModel>(
-                builder: (context, transactionViewModel, incomeViewModel, _) {
-                  return KenyaInsightsCard(
-                    selectedPeriod: TimePeriod.currentMonth(),
-                    allTransactions: transactionViewModel.allTransactions,
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
-              
-              // Expense Optimization Card (New)
-              Container(
-                key: _expenseOptimizationKey,
-                child: Consumer2<TransactionViewModel, IncomeViewModel>(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              colorScheme.surface,
+              colorScheme.surfaceContainerHighest,
+            ],
+          ),
+        ),
+        child: SingleChildScrollView(
+          controller: _scrollController,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Enhanced Period Selector
+                AdvancedPeriodSelector(
+                  selectedPeriod: TimePeriod.currentMonth(),
+                  onPeriodChanged: _onTimePeriodChanged,
+                  showComparison: true,
+                ),
+                const SizedBox(height: 16),
+                
+                // Quick Action Items Card (New)
+                QuickActionItemsCard(
+                  selectedPeriod: TimePeriod.currentMonth(),
+                ),
+                const SizedBox(height: 16),
+                
+                // Cross-Screen Navigation Hub (New)
+                const CrossScreenNavigationHubCard(),
+                const SizedBox(height: 16),
+                
+                // Smart Anomaly Detection Card (New)
+                SmartAnomalyCard(
+                  selectedPeriod: TimePeriod.currentMonth(),
+                ),
+                const SizedBox(height: 16),
+                
+                // Comparative Analysis Card (New)
+                Consumer2<TransactionViewModel, IncomeViewModel>(
                   builder: (context, transactionViewModel, incomeViewModel, _) {
-                    return ExpenseOptimizationCard(
+                    return ComparativeAnalysisCard(
                       selectedPeriod: TimePeriod.currentMonth(),
                       allTransactions: transactionViewModel.allTransactions,
-                      highlightOnInit: widget.focusExpenseOptimization,
+                      allIncomeSources: incomeViewModel.incomeSources,
                     );
                   },
                 ),
-              ),
-              const SizedBox(height: 16),
-              
-              // AI Financial Intelligence Card (NEW)
-              _buildAIIntelligenceCard(),
-              const SizedBox(height: 16),
-              
-              // Enhanced cards (updated to work with new period system)
-              _buildFinancialOverviewCard(), // Merged Income vs Expenses
-              const SizedBox(height: 16),
-              _buildSmartCategoryAnalysisCard(), // Enhanced Category Breakdown
-              const SizedBox(height: 16),
-              _buildPredictiveBudgetCard(), // Enhanced Budget Performance
-            ],
+                const SizedBox(height: 16),
+                
+                // Kenya-Specific Insights Card (New)
+                Consumer2<TransactionViewModel, IncomeViewModel>(
+                  builder: (context, transactionViewModel, incomeViewModel, _) {
+                    return KenyaInsightsCard(
+                      selectedPeriod: TimePeriod.currentMonth(),
+                      allTransactions: transactionViewModel.allTransactions,
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                
+                // Expense Optimization Card (New)
+                Container(
+                  key: _expenseOptimizationKey,
+                  child: Consumer2<TransactionViewModel, IncomeViewModel>(
+                    builder: (context, transactionViewModel, incomeViewModel, _) {
+                      return ExpenseOptimizationCard(
+                        selectedPeriod: TimePeriod.currentMonth(),
+                        allTransactions: transactionViewModel.allTransactions,
+                        highlightOnInit: widget.focusExpenseOptimization,
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // AI Financial Intelligence Card (NEW)
+                _buildAIIntelligenceCard(),
+                const SizedBox(height: 16),
+                
+                // Enhanced cards (updated to work with new period system)
+                _buildFinancialOverviewCard(), // Merged Income vs Expenses
+                const SizedBox(height: 16),
+                _buildSmartCategoryAnalysisCard(), // Enhanced Category Breakdown
+                const SizedBox(height: 16),
+                _buildPredictiveBudgetCard(), // Enhanced Budget Performance
+              ],
+            ),
           ),
         ),
       ),
@@ -485,8 +527,6 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
         );
       },
     );
-  }
-
   }
   
   // Enhanced Smart Category Analysis Card (replaces Category Breakdown)
@@ -1178,3 +1218,4 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
     return AppTheme.categoryColors['Other']!.withAlpha((0.7 * 255).toInt());
   }
 
+}

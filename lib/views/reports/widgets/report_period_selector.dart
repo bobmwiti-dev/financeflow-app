@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../../themes/app_theme.dart';
 
 class ReportPeriodSelector extends StatelessWidget {
   final String selectedPeriod;
   final Function(String) onPeriodChanged;
+
+  static const Color _accentColor = Color(0xFF6366F1);
 
   const ReportPeriodSelector({
     super.key,
@@ -59,9 +60,9 @@ class ReportPeriodSelector extends StatelessWidget {
           }
         },
         backgroundColor: Colors.grey.shade200,
-        selectedColor: AppTheme.primaryColor.withValues(alpha: 0.2),
+        selectedColor: _accentColor.withValues(alpha: 0.2),
         labelStyle: TextStyle(
-          color: isSelected ? AppTheme.primaryColor : Colors.black,
+          color: isSelected ? _accentColor : Colors.black,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         ),
       ),

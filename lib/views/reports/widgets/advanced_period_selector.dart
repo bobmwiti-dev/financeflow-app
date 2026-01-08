@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../models/time_period_model.dart';
-import '../../../themes/app_theme.dart';
 
 class AdvancedPeriodSelector extends StatefulWidget {
   final TimePeriod selectedPeriod;
@@ -23,6 +22,8 @@ class _AdvancedPeriodSelectorState extends State<AdvancedPeriodSelector>
     with TickerProviderStateMixin {
   late TabController _tabController;
   late TimePeriod _currentPeriod;
+
+  static const Color _accentColor = Color(0xFF6366F1);
 
   @override
   void initState() {
@@ -165,14 +166,14 @@ class _AdvancedPeriodSelectorState extends State<AdvancedPeriodSelector>
         gradient: LinearGradient(
           colors: [
             Colors.white,
-            AppTheme.primaryColor.withValues(alpha: 0.02),
+            _accentColor.withValues(alpha: 0.02),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppTheme.primaryColor.withValues(alpha: 0.1),
+          color: _accentColor.withValues(alpha: 0.1),
         ),
         boxShadow: [
           BoxShadow(
@@ -195,11 +196,11 @@ class _AdvancedPeriodSelectorState extends State<AdvancedPeriodSelector>
               controller: _tabController,
               onTap: _onTabChanged,
               indicator: BoxDecoration(
-                color: AppTheme.primaryColor,
+                color: _accentColor,
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.3),
+                    color: _accentColor.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -246,15 +247,15 @@ class _AdvancedPeriodSelectorState extends State<AdvancedPeriodSelector>
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        AppTheme.primaryColor.withValues(alpha: 0.1),
-                        AppTheme.primaryColor.withValues(alpha: 0.05),
+                        _accentColor.withValues(alpha: 0.1),
+                        _accentColor.withValues(alpha: 0.05),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.2),
+                      color: _accentColor.withValues(alpha: 0.2),
                     ),
                   ),
                   child: Column(
@@ -265,7 +266,7 @@ class _AdvancedPeriodSelectorState extends State<AdvancedPeriodSelector>
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryColor,
+                          color: _accentColor,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -332,7 +333,7 @@ class _AdvancedPeriodSelectorState extends State<AdvancedPeriodSelector>
         child: IconButton(
           icon: Icon(icon),
           onPressed: onPressed,
-          color: AppTheme.primaryColor,
+          color: _accentColor,
           iconSize: 20,
         ),
       ),
@@ -371,14 +372,14 @@ class _AdvancedPeriodSelectorState extends State<AdvancedPeriodSelector>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withValues(alpha: 0.1),
+              color: _accentColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
               'Comparison',
               style: TextStyle(
                 fontSize: 10,
-                color: AppTheme.primaryColor,
+                color: _accentColor,
                 fontWeight: FontWeight.bold,
               ),
             ),
