@@ -196,28 +196,6 @@ class _SpendingChallengesScreenState extends State<SpendingChallengesScreen> wit
     );
   }
 
-  Widget _buildChallengesList(ChallengeViewModel challengeViewModel) {
-    final challenges = challengeViewModel.challenges;
-    
-    if (challenges.isEmpty) {
-      return _buildEmptyState();
-    }
-
-    final estimatedHeight = (challenges.length * 150.0).clamp(200.0, 900.0);
-
-    return SizedBox(
-      height: estimatedHeight,
-      child: ListView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: challenges.length,
-        itemBuilder: (context, index) {
-          final challenge = challenges[index];
-          return _buildEnhancedChallengeCard(challenge, index);
-        },
-      ),
-    );
-  }
-
   List<Widget> _buildChallengesSlivers(ChallengeViewModel challengeViewModel) {
     final challenges = challengeViewModel.challenges;
 
