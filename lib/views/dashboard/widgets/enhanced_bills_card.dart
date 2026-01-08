@@ -29,7 +29,6 @@ class EnhancedBillsCard extends StatefulWidget {
 class _EnhancedBillsCardState extends State<EnhancedBillsCard> 
     with TickerProviderStateMixin {
   final Logger _logger = Logger('EnhancedBillsCard');
-  late AnimationController _pulseController;
   late AnimationController _slideController;
   String _selectedFilter = 'Upcoming';
   final List<String> _filters = ['All', 'Upcoming', 'Overdue', 'Paid'];
@@ -37,11 +36,6 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat();
-    
     _slideController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -51,7 +45,6 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
 
   @override
   void dispose() {
-    _pulseController.dispose();
     _slideController.dispose();
     super.dispose();
   }
@@ -193,10 +186,7 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
                       ),
                     ],
                   ),
-                ).animate(controller: _pulseController)
-                  .scale(begin: const Offset(1.0, 1.0), end: const Offset(1.05, 1.05))
-                  .then()
-                  .scale(begin: const Offset(1.05, 1.05), end: const Offset(1.0, 1.0)),
+                ),
                 const SizedBox(width: 8),
               ],
               Container(
@@ -496,10 +486,7 @@ class _EnhancedBillsCardState extends State<EnhancedBillsCard>
                                   width: 2,
                                 ),
                               ),
-                            ).animate(onPlay: (controller) => controller.repeat())
-                              .scale(begin: const Offset(1.0, 1.0), end: const Offset(1.2, 1.2), duration: 1000.ms)
-                              .then()
-                              .scale(begin: const Offset(1.2, 1.2), end: const Offset(1.0, 1.0), duration: 1000.ms),
+                            ),
                           ),
                       ],
                     ),

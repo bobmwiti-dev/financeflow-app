@@ -238,7 +238,7 @@ class _QuickActionsPanelState extends State<QuickActionsPanel> with SingleTicker
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: GridView.builder(
-                    shrinkWrap: true,
+                    primary: false,
                     physics: const NeverScrollableScrollPhysics(),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 3,
@@ -395,7 +395,7 @@ class _QuickActionsPanelState extends State<QuickActionsPanel> with SingleTicker
                     : Padding(
                         padding: const EdgeInsets.all(20.0),
                         child: ListView.builder(
-                          shrinkWrap: true,
+                          primary: false,
                           itemCount: widget.recentPayees.length,
                           itemBuilder: (context, index) {
                             if (index >= widget.recentPayees.length) {

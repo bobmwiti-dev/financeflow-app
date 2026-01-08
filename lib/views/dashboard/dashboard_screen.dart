@@ -70,6 +70,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _isRefreshing = false;
   bool _isLoading = true;
   bool _isError = false;
+  bool _enableEntryAnimations = true;
   
   // Listen to transaction updates from TransactionViewModel
   TransactionViewModel? _transactionViewModel;
@@ -148,6 +149,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     
     // Start entrance animation
     _animationController.forward();
+
+    Future.delayed(const Duration(milliseconds: 1600), () {
+      if (!mounted) return;
+      setState(() {
+        _enableEntryAnimations = false;
+      });
+    });
   }
 
   Future<void> _maybeRunFirstTimeFlows() async {
@@ -237,7 +245,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void _recomputeMonthlySummary(List<models.Transaction> monthTransactions) {
     try {
       final incomeVm = _incomeViewModel;
-      incomeVm.setSelectedMonth(_selectedMonthDate);
 
       final budgetVm = _budgetViewModel ?? Provider.of<BudgetViewModel>(context, listen: false);
 
@@ -636,50 +643,63 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       );
     }
 
-    // Main body animation is now handled by flutter_animate on SingleChildScrollView
+    final dashboardSliverChildren = _buildDashboardSliverChildren();
 
     return RefreshIndicator(
       onRefresh: () async {
         logger.info('Dashboard refresh triggered by pull-to-refresh');
         return _refreshDashboard();
       },
-      child: SingleChildScrollView(
+      child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 24), // Added bottom padding
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildMonthSelector(),
-            const SizedBox(height: 12),
-            _buildUserGreeting(),
-            if (_recentBankSmsImported > 0) ...[
-              const SizedBox(height: 8),
-              _buildBankSmsImportBanner(),
-            ],
-
-            // Insight of the Day should be the first card after greeting
-            InsightOfTheDayCard(
-              selectedMonth: _selectedMonthDate,
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final builders = dashboardSliverChildren;
+                  return builders[index](context);
+                },
+                childCount: dashboardSliverChildren.length,
+              ),
             ),
-            const SizedBox(height: 8),
+          ),
+        ],
+      ),
+    );
+  }
 
-            // This month at a glance
-            RepaintBoundary(
-              child: EnhancedMonthlySummary(
+  List<Widget Function(BuildContext)> _buildDashboardSliverChildren() {
+    return <Widget Function(BuildContext)>[
+      (_) => _buildMonthSelector(),
+      (_) => const SizedBox(height: 12),
+      (_) => _buildUserGreeting(),
+      if (_recentBankSmsImported > 0) ...[
+        (_) => const SizedBox(height: 8),
+        (_) => _buildBankSmsImportBanner(),
+      ],
+      (_) => InsightOfTheDayCard(selectedMonth: _selectedMonthDate),
+      (_) => const SizedBox(height: 8),
+      (_) => RepaintBoundary(
+            child: _maybeFadeIn(
+              EnhancedMonthlySummary(
                 selectedMonth: _selectedMonthDate,
                 summary: _monthlySummary,
-              ).animate().fadeIn(delay: 50.ms, duration: 400.ms),
+              ),
+              delay: 50.ms,
+              duration: 400.ms,
             ),
-            const SizedBox(height: 16),
-
-            // Financial summary card with chart visualization
-            Consumer<IncomeViewModel>(
-              builder: (context, incomeViewModel, child) {
-                final summaryIncome = _monthlySummary?.income ?? incomeViewModel.getTotalIncome();
-                final summaryExpenses = _monthlySummary?.expenses ?? _expenses;
-                final summaryCategoryTotals = _monthlySummary?.categoryTotals ?? _categoryTotals;
-                return RepaintBoundary(
-                  child: FinancialSummaryCard(
+          ),
+      (_) => const SizedBox(height: 16),
+      (_) => Consumer<IncomeViewModel>(
+            builder: (context, incomeViewModel, child) {
+              final summaryIncome = _monthlySummary?.income ?? incomeViewModel.getTotalIncome();
+              final summaryExpenses = _monthlySummary?.expenses ?? _expenses;
+              final summaryCategoryTotals = _monthlySummary?.categoryTotals ?? _categoryTotals;
+              return RepaintBoundary(
+                child: _maybeFadeIn(
+                  FinancialSummaryCard(
                     income: summaryIncome,
                     expenses: summaryExpenses,
                     balance: _balance,
@@ -691,148 +711,177 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     transactionHistory: _transactionHistory,
                     incomeHistory: _incomeHistory,
                     selectedMonth: _selectedMonthDate,
-                  ).animate().fadeIn(delay: 75.ms, duration: 400.ms),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Monthly spending trend card
-            RepaintBoundary(
-              child: const SpendingTrendChart().animate().fadeIn(delay: 100.ms, duration: 400.ms),
-            ),
-            const SizedBox(height: 16),
-
-            // Safe-to-spend + cash flow forecast
-            RepaintBoundary(
-              child: EnhancedSafeToSpendCard(
-                selectedMonth: _selectedMonthDate,
-              ).animate().fadeIn(delay: 125.ms, duration: 400.ms),
-            ),
-            const SizedBox(height: 16),
-            RepaintBoundary(
-              child: EnhancedCashFlowForecastCard(
-                onViewDetails: () => Navigator.pushNamed(context, '/cash_flow_forecast'),
-              ).animate().fadeIn(delay: 150.ms, duration: 400.ms),
-            ),
-            const SizedBox(height: 16),
-
-            // Next upcoming debits
-            const RepaintBoundary(
-              child: EnhancedBillsCard(),
-            ),
-            const SizedBox(height: 16),
-
-            // Goals & emergency fund
-            Consumer<IncomeViewModel>(
-              builder: (context, incomeViewModel, child) {
-                final summaryIncome = _monthlySummary?.income ?? incomeViewModel.getTotalIncome();
-                final summaryExpenses = _monthlySummary?.expenses ?? _expenses;
-                return RepaintBoundary(
-                  child: UnifiedSavingsCard(
-                    income: summaryIncome,
-                    expenses: summaryExpenses,
-                    targetSavingsRate: 0.30,
-                    onViewAllGoals: () => Navigator.pushNamed(context, '/goals'),
-                    onGoalTap: (goal) => Navigator.pushNamed(context, '/goal_details', arguments: goal),
                   ),
-                );
-              },
+                  delay: 75.ms,
+                  duration: 400.ms,
+                ),
+              );
+            },
+          ),
+      (_) => const SizedBox(height: 16),
+      (_) => RepaintBoundary(
+            child: _maybeFadeIn(
+              const SpendingTrendChart(),
+              delay: 100.ms,
+              duration: 400.ms,
             ),
-            const SizedBox(height: 16),
-            RepaintBoundary(
-              child: EnhancedEmergencyFundCard().animate().fadeIn(delay: 150.ms, duration: 400.ms),
+          ),
+      (_) => const SizedBox(height: 16),
+      (_) => RepaintBoundary(
+            child: _maybeFadeIn(
+              EnhancedSafeToSpendCard(selectedMonth: _selectedMonthDate),
+              delay: 125.ms,
+              duration: 400.ms,
             ),
-            const SizedBox(height: 16),
+          ),
+      (_) => const SizedBox(height: 16),
+      (_) => RepaintBoundary(
+            child: _maybeFadeIn(
+              EnhancedCashFlowForecastCard(
+                onViewDetails: () => Navigator.pushNamed(context, '/cash_flow_forecast'),
+              ),
+              delay: 150.ms,
+              duration: 400.ms,
+            ),
+          ),
+      (_) => const SizedBox(height: 16),
+      (_) => const RepaintBoundary(child: EnhancedBillsCard()),
+      (_) => const SizedBox(height: 16),
+      (_) => Consumer<IncomeViewModel>(
+            builder: (context, incomeViewModel, child) {
+              final summaryIncome = _monthlySummary?.income ?? incomeViewModel.getTotalIncome();
+              final summaryExpenses = _monthlySummary?.expenses ?? _expenses;
+              return RepaintBoundary(
+                child: UnifiedSavingsCard(
+                  income: summaryIncome,
+                  expenses: summaryExpenses,
+                  targetSavingsRate: 0.30,
+                  onViewAllGoals: () => Navigator.pushNamed(context, '/goals'),
+                  onGoalTap: (goal) => Navigator.pushNamed(
+                    context,
+                    '/goal_details',
+                    arguments: goal,
+                  ),
+                ),
+              );
+            },
+          ),
+      (_) => const SizedBox(height: 16),
+      (_) => RepaintBoundary(
+            child: _maybeFadeIn(
+              EnhancedEmergencyFundCard(),
+              delay: 150.ms,
+              duration: 400.ms,
+            ),
+          ),
+      (_) => const SizedBox(height: 16),
+      (_) => RepaintBoundary(
+            child: _maybeFadeIn(
+              SideHustleSummaryCard(selectedMonth: _selectedMonthDate),
+              delay: 175.ms,
+              duration: 400.ms,
+            ),
+          ),
+      (_) => const SizedBox(height: 16),
+      (_) => RepaintBoundary(
+            child: _maybeFadeIn(
+              AccountBalanceWidget(showAllAccounts: false),
+              delay: 200.ms,
+              duration: 400.ms,
+            ),
+          ),
+      (_) => const SizedBox(height: 16),
+      (_) => RepaintBoundary(
+            child: _maybeFadeIn(
+              MpesaImportCard(),
+              delay: 225.ms,
+              duration: 400.ms,
+            ),
+          ),
+      (_) => const SizedBox(height: 16),
+      (_) => RepaintBoundary(
+            child: RecentTransactionsCard(selectedMonth: _selectedMonthDate),
+          ),
+      (_) => const SizedBox(height: 16),
+      (_) => RepaintBoundary(
+            child: _maybeFadeIn(
+              QuickActionsPanel(
+                recentPayees: _frequentPayees,
+                onActionSelected: (action) {
+                  switch (action) {
+                    case 'add_expense':
+                      Navigator.pushNamed(
+                        context,
+                        '/add_transaction',
+                        arguments: {'type': 'expense'},
+                      );
+                      break;
+                    case 'add_income':
+                      break;
+                    case 'new_bill':
+                      Navigator.pushNamed(context, '/add_bill');
+                      break;
+                    case 'new_goal':
+                      NavigationService.navigateTo(AppConstants.addGoalRoute);
+                      break;
+                    case 'transfer':
+                      NavigationService.navigateTo(AppConstants.transferRoute);
+                    case 'new_budget':
+                      NavigationService.navigateTo(AppConstants.addBudgetRoute);
+                      break;
+                    case 'mpesa_import':
+                      Navigator.pushNamed(context, '/mpesa_import');
+                      break;
+                    case 'transport_intelligence':
+                      Navigator.pushNamed(context, '/transport_intelligence');
+                      break;
+                    default:
+                      break;
+                  }
+                },
+                onPayeeSelected: (payee) {
+                  Navigator.pushNamed(
+                    context,
+                    '/add_transaction',
+                    arguments: {'payee': payee},
+                  );
+                },
+              ),
+              delay: 400.ms,
+              duration: 400.ms,
+            ),
+          ),
+      (_) => const SizedBox(height: 24),
+      (_) => RepaintBoundary(
+            child: _maybeFadeIn(
+              SmartAlertsCard(),
+              delay: 700.ms,
+              duration: 500.ms,
+            ),
+          ),
+      (_) => const SizedBox(height: 24),
+      (_) => RepaintBoundary(
+            child: _maybeFadeIn(
+              BudgetAdherenceCard(selectedMonth: _selectedMonthDate),
+              delay: 610.ms,
+              duration: 500.ms,
+            ),
+          ),
+      (_) => const SizedBox(height: 24),
+      (_) => const SizedBox(height: 70),
+    ];
+  }
 
-            // Side-hustle (Business) Summary
-            RepaintBoundary(
-              child: SideHustleSummaryCard(
-                selectedMonth: _selectedMonthDate,
-              ).animate().fadeIn(delay: 175.ms, duration: 400.ms),
-            ),
-            const SizedBox(height: 16),
-
-            // Account Balance Widget
-            RepaintBoundary(
-              child: AccountBalanceWidget(
-                showAllAccounts: false, // Show only default account on dashboard
-              ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
-            ),
-            const SizedBox(height: 16),
-
-            // M-Pesa Import Card
-            RepaintBoundary(
-              child: MpesaImportCard().animate().fadeIn(delay: 225.ms, duration: 400.ms),
-            ),
-            const SizedBox(height: 16),
-            // Recent Transactions
-            RepaintBoundary(
-              child: RecentTransactionsCard(selectedMonth: _selectedMonthDate),
-            ),
-            const SizedBox(height: 16),
-            
-            // Quick action buttons
-            RepaintBoundary(
-              child: QuickActionsPanel(
-                  recentPayees: _frequentPayees, // Use dynamic payees
-                  onActionSelected: (action) {
-                    switch (action) {
-                      case 'add_expense':
-                         Navigator.pushNamed(context, '/add_transaction', arguments: {'type': 'expense'});
-                         break;
-                       case 'add_income':
-                         // This case is handled directly by QuickActionsPanel
-                         // No need to handle it here as the panel navigates to IncomeFormScreen
-                         break;
-                      case 'new_bill':
-                        Navigator.pushNamed(context, '/add_bill');
-                        break;
-                      case 'new_goal':
-                        NavigationService.navigateTo(AppConstants.addGoalRoute);
-                        break;
-                      case 'transfer':
-                         NavigationService.navigateTo(AppConstants.transferRoute);
-                       case 'new_budget':
-                         NavigationService.navigateTo(AppConstants.addBudgetRoute);
-                         break;
-                       case 'mpesa_import':
-                         Navigator.pushNamed(context, '/mpesa_import');
-                         break;
-                       case 'transport_intelligence':
-                         Navigator.pushNamed(context, '/transport_intelligence');
-                         break;
-                       default:
-                         break;
-                    }
-                  },
-                  onPayeeSelected: (payee) {
-                    Navigator.pushNamed(
-                      context, 
-                      '/add_transaction',
-                      arguments: {'payee': payee}
-                    );
-                  },
-                ).animate().fadeIn(delay: 400.ms, duration: 400.ms), // Keep existing item animation
-            ),
-            const SizedBox(height: 24),
-            
-            // Smart Alerts Card
-            RepaintBoundary(
-              child: SmartAlertsCard().animate().fadeIn(delay: 700.ms, duration: 500.ms),
-            ),
-            const SizedBox(height: 24),
-            
-            // Spending by category
-            RepaintBoundary(
-              child: BudgetAdherenceCard(selectedMonth: _selectedMonthDate).animate().fadeIn(delay: 610.ms, duration: 500.ms),
-            ),
-            const SizedBox(height: 24),
-            const SizedBox(height: 70), // Space for FAB
-          ],
-        ),
-      ),
-    );
+  Widget _maybeFadeIn(
+    Widget child, {
+    Duration? delay,
+    Duration? duration,
+  }) {
+    if (!_enableEntryAnimations) return child;
+    return child.animate().fadeIn(
+          delay: delay,
+          duration: duration,
+        );
   }
   
   Widget _buildMonthSelector() {
