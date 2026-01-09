@@ -218,8 +218,7 @@ class _KenyaInsightsCardState extends State<KenyaInsightsCard>
   }
 
   Map<String, dynamic> _analyzeSeasonalPatterns(List<Transaction> transactions) {
-    final now = DateTime.now();
-    final currentMonth = now.month;
+    final currentMonth = widget.selectedPeriod.startDate.month;
     
     String seasonalInsight = '';
     String recommendation = '';

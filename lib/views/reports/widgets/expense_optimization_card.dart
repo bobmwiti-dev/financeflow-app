@@ -224,8 +224,8 @@ class _ExpenseOptimizationCardState extends State<ExpenseOptimizationCard>
     }
 
     // Check for unused subscriptions (no transactions in last 2 months)
-    final now = DateTime.now();
-    final twoMonthsAgo = DateTime(now.year, now.month - 2, now.day);
+    final anchor = widget.selectedPeriod.endDate;
+    final twoMonthsAgo = DateTime(anchor.year, anchor.month - 2, 1);
     
     for (final entry in subscriptionGroups.entries) {
       final recentUsage = entry.value.where((tx) => tx.date.isAfter(twoMonthsAgo)).length;

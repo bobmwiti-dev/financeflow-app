@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:logging/logging.dart';
 
@@ -40,19 +41,16 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
   int _selectedIndex = 3; // Reports tab selected
   DateTime _selectedMonth = DateTime.now(); // Keep for backward compatibility
 
+  TimePeriod _selectedPeriod = TimePeriod.currentMonth();
+
   LinearGradient get _accentGradient => const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          Color(0xFF6366F1),
-          Color(0xFF8B5CF6),
+          AppTheme.primaryColor,
+          AppTheme.secondaryColor,
         ],
       );
-
-  // Month selection notifier (first day of the month)
-  final ValueNotifier<DateTime> _selectedMonthNotifier = ValueNotifier(
-    DateTime(DateTime.now().year, DateTime.now().month, 1),
-  );
   final GlobalKey _expenseOptimizationKey = GlobalKey();
   final ScrollController _scrollController = ScrollController();
   bool _hasScrolledToExpenseOptimization = false;
@@ -62,6 +60,7 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
     super.initState();
     // Initialize with current month
     _selectedMonth = DateTime.now();
+    _selectedPeriod = TimePeriod.currentMonth();
     
     // Load all data first to populate the month dropdown and reports
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -139,6 +138,7 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
   }
 
   void _onItemSelected(int index) {
+    HapticFeedback.selectionClick();
     setState(() => _selectedIndex = index);
 
     final String route = NavigationService.routeForDrawerIndex(index);
@@ -151,8 +151,8 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
 
   void _onTimePeriodChanged(TimePeriod newPeriod) {
     setState(() {
-      // Update backward compatibility month for existing cards
-      _selectedMonth = DateTime.now();
+      _selectedPeriod = newPeriod;
+      _selectedMonth = DateTime(newPeriod.startDate.year, newPeriod.startDate.month, 1);
     });
     
     final logger = Logger('ReportsScreen');
@@ -161,7 +161,6 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
 
   @override
   void dispose() {
-    _selectedMonthNotifier.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -215,6 +214,7 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
             icon: const Icon(Icons.refresh),
             color: Colors.white,
             onPressed: () {
+              HapticFeedback.selectionClick();
               // Manually refresh all transactions
               final viewModel = Provider.of<TransactionViewModel>(context, listen: false);
               viewModel.loadAllTransactions().then((_) {
@@ -228,6 +228,7 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
           ),
           NotificationBadge(
             onTap: () {
+              HapticFeedback.selectionClick();
               Navigator.pushNamed(context, '/notifications');
             },
           ),
@@ -235,6 +236,7 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
             icon: const Icon(Icons.share),
             color: Colors.white,
             onPressed: () {
+              HapticFeedback.selectionClick();
               // Share reports
             },
           ),
@@ -250,8 +252,9 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              colorScheme.surface,
-              colorScheme.surfaceContainerHighest,
+              colorScheme.primary.withAlpha((0.06 * 255).toInt()),
+              Theme.of(context).scaffoldBackgroundColor,
+              Theme.of(context).scaffoldBackgroundColor,
             ],
           ),
         ),
@@ -264,7 +267,7 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
               children: [
                 // Enhanced Period Selector
                 AdvancedPeriodSelector(
-                  selectedPeriod: TimePeriod.currentMonth(),
+                  selectedPeriod: _selectedPeriod,
                   onPeriodChanged: _onTimePeriodChanged,
                   showComparison: true,
                 ),
@@ -272,7 +275,7 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
                 
                 // Quick Action Items Card (New)
                 QuickActionItemsCard(
-                  selectedPeriod: TimePeriod.currentMonth(),
+                  selectedPeriod: _selectedPeriod,
                 ),
                 const SizedBox(height: 16),
                 
@@ -282,7 +285,7 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
                 
                 // Smart Anomaly Detection Card (New)
                 SmartAnomalyCard(
-                  selectedPeriod: TimePeriod.currentMonth(),
+                  selectedPeriod: _selectedPeriod,
                 ),
                 const SizedBox(height: 16),
                 
@@ -290,7 +293,7 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
                 Consumer2<TransactionViewModel, IncomeViewModel>(
                   builder: (context, transactionViewModel, incomeViewModel, _) {
                     return ComparativeAnalysisCard(
-                      selectedPeriod: TimePeriod.currentMonth(),
+                      selectedPeriod: _selectedPeriod,
                       allTransactions: transactionViewModel.allTransactions,
                       allIncomeSources: incomeViewModel.incomeSources,
                     );
@@ -302,7 +305,7 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
                 Consumer2<TransactionViewModel, IncomeViewModel>(
                   builder: (context, transactionViewModel, incomeViewModel, _) {
                     return KenyaInsightsCard(
-                      selectedPeriod: TimePeriod.currentMonth(),
+                      selectedPeriod: _selectedPeriod,
                       allTransactions: transactionViewModel.allTransactions,
                     );
                   },
@@ -315,7 +318,7 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
                   child: Consumer2<TransactionViewModel, IncomeViewModel>(
                     builder: (context, transactionViewModel, incomeViewModel, _) {
                       return ExpenseOptimizationCard(
-                        selectedPeriod: TimePeriod.currentMonth(),
+                        selectedPeriod: _selectedPeriod,
                         allTransactions: transactionViewModel.allTransactions,
                         highlightOnInit: widget.focusExpenseOptimization,
                       );
@@ -376,18 +379,16 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
         int incomeTransactions = 0;
         int expenseTransactions = 0;
 
-        // Get income from IncomeViewModel (filtered by selected time period)
-        final currentMonth = DateTime.now();
-        final incomeSourcesForPeriod = incomeViewModel.incomeSources.where((source) => 
-          source.date.year == currentMonth.year && source.date.month == currentMonth.month).toList();
+        final incomeSourcesForPeriod = incomeViewModel.incomeSources
+            .where((source) => _selectedPeriod.containsDate(source.date))
+            .toList();
         income = incomeSourcesForPeriod.fold(0.0, (sum, source) => sum + source.amount);
         incomeTransactions = incomeSourcesForPeriod.length;
 
-        // Get expenses from TransactionViewModel (filtered by selected time period)
         final selectedPeriodExpenses = transactionViewModel.allTransactions
             .where((t) =>
                 t.type == app_models.TransactionType.expense &&
-                t.date.year == currentMonth.year && t.date.month == currentMonth.month)
+                _selectedPeriod.containsDate(t.date))
             .toList();
         expenses = selectedPeriodExpenses.fold(0.0, (sum, t) => sum + t.amount.abs());
         expenseTransactions = selectedPeriodExpenses.length;
@@ -396,7 +397,7 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
         final savingsRate = income > 0 ? (netIncome / income) * 100 : 0.0;
 
         return ReportCard(
-          title: '💰 Financial Overview - ${currentMonth.month}/${currentMonth.year}',
+          title: '💰 Financial Overview - ${_selectedPeriod.displayName}',
           child: Column(
             children: [
               // Summary Cards Row
@@ -553,11 +554,9 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
             ? viewModel.allTransactions 
             : viewModel.transactions;
 
-        final currentMonth = DateTime.now();
         final selectedMonthTransactions = allTransactions.where((tx) {
           return tx.type == app_models.TransactionType.expense &&
-                 tx.date.year == currentMonth.year &&
-                 tx.date.month == currentMonth.month;
+              _selectedPeriod.containsDate(tx.date);
         }).toList();
 
         if (selectedMonthTransactions.isEmpty) {
@@ -594,7 +593,7 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
         final topCategories = sortedCategories.take(5).toList();
 
         return ReportCard(
-          title: '📊 Smart Category Analysis - ${currentMonth.month}/${currentMonth.year}',
+          title: '📊 Smart Category Analysis - ${_selectedPeriod.displayName}',
           child: Column(
             children: [
               // Top spending insight
@@ -737,12 +736,11 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
   Widget _buildPredictiveBudgetCard() {
     return Consumer3<BudgetViewModel, TransactionViewModel, IncomeViewModel>(
       builder: (context, budgetVm, transactionVm, incomeVm, _) {
-        final currentMonth = DateTime.now();
-        // Ensure budget data is loaded for the selected month
-        if (budgetVm.selectedMonth.year != currentMonth.year ||
-            budgetVm.selectedMonth.month != currentMonth.month) {
+        final selectedMonth = DateTime(_selectedPeriod.startDate.year, _selectedPeriod.startDate.month, 1);
+        if (budgetVm.selectedMonth.year != selectedMonth.year ||
+            budgetVm.selectedMonth.month != selectedMonth.month) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            budgetVm.loadBudgetsForMonth(currentMonth);
+            budgetVm.loadBudgetsForMonth(selectedMonth);
           });
         }
 
@@ -780,8 +778,7 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
 
         final selectedPeriodTransactions = allTransactions.where((tx) {
           return tx.type == app_models.TransactionType.expense &&
-                 tx.date.year == currentMonth.year &&
-                 tx.date.month == currentMonth.month;
+              _selectedPeriod.containsDate(tx.date);
         }).toList();
 
         final categorySpending = <String, double>{};
@@ -797,17 +794,30 @@ class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateM
         
         // Predictive analysis
         final now = DateTime.now();
-        final endOfMonth = DateTime(currentMonth.year, currentMonth.month + 1, 0);
+        final endOfMonth = DateTime(selectedMonth.year, selectedMonth.month + 1, 0);
         final daysInPeriod = endOfMonth.day;
-        final daysPassed = now.day;
-        final daysRemaining = daysInPeriod - daysPassed;
+
+        int daysPassed;
+        int daysRemaining;
+        if (now.year == selectedMonth.year && now.month == selectedMonth.month) {
+          daysPassed = now.day.clamp(0, daysInPeriod);
+          daysRemaining = (daysInPeriod - daysPassed).clamp(0, daysInPeriod);
+        } else if (DateTime(now.year, now.month, 1).isAfter(selectedMonth)) {
+          // Selected month is in the past
+          daysPassed = daysInPeriod;
+          daysRemaining = 0;
+        } else {
+          // Selected month is in the future
+          daysPassed = 0;
+          daysRemaining = daysInPeriod;
+        }
         
         final dailySpendRate = daysPassed > 0 ? totalSpent / daysPassed : 0;
         final projectedSpending = totalSpent + (dailySpendRate * daysRemaining);
         final projectedUtilization = totalBudget > 0 ? (projectedSpending / totalBudget) * 100 : 0.0;
 
         return ReportCard(
-          title: '🎯 Predictive Budget Analysis - ${currentMonth.month}/${currentMonth.year}',
+          title: '🎯 Predictive Budget Analysis - ${TimePeriod.formatMonthlyPeriod(selectedMonth)}',
           child: Column(
             children: [
               // Overall budget status
