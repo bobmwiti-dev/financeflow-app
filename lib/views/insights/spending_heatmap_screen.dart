@@ -253,49 +253,63 @@ class _SpendingHeatmapScreenState extends State<SpendingHeatmapScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Colors.transparent,
       appBar: _buildPremiumAppBar(),
       drawer: AppNavigationDrawer(
         selectedIndex: _selectedIndex,
         onItemSelected: _onItemSelected,
       ),
-      body: Consumer<vm.TransactionViewModel>(
-        builder: (context, txVm, _) {
-          // Ensure we have loaded all transactions for comprehensive view
-          if (txVm.allTransactions.isEmpty && !txVm.isLoading) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              txVm.loadAllTransactions();
-            });
-          }
-          
-          // Ensure we load transactions for the focused month if needed
-          final focusedMonth = DateTime(_focusedDay.year, _focusedDay.month, 1);
-          if (txVm.selectedMonth.year != focusedMonth.year ||
-              txVm.selectedMonth.month != focusedMonth.month) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              txVm.loadTransactionsByMonth(focusedMonth);
-            });
-          }
-          
-          if (txVm.isLoading) {
-            return _buildLoadingState();
-          }
-          
-          // Use allTransactions for comprehensive data, but aggregate will filter by month
-          _aggregateTransactions(txVm.allTransactions);
-          
-          return RefreshIndicator(
-            onRefresh: () => _refreshData(txVm),
-            child: Column(
-              children: [
-                _buildViewModeSelector(),
-                Expanded(
-                  child: _buildSelectedView(),
-                ),
-              ],
-            ),
-          );
-        },
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppTheme.primaryColor.withValues(alpha: 0.08),
+              AppTheme.accentColor.withValues(alpha: 0.06),
+              const Color(0xFFF8FAFC),
+            ],
+          ),
+        ),
+        child: Consumer<vm.TransactionViewModel>(
+          builder: (context, txVm, _) {
+            // Ensure we have loaded all transactions for comprehensive view
+            if (txVm.allTransactions.isEmpty && !txVm.isLoading) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                txVm.loadAllTransactions();
+              });
+            }
+            
+            // Ensure we load transactions for the focused month if needed
+            final focusedMonth = DateTime(_focusedDay.year, _focusedDay.month, 1);
+            if (txVm.selectedMonth.year != focusedMonth.year ||
+                txVm.selectedMonth.month != focusedMonth.month) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                txVm.loadTransactionsByMonth(focusedMonth);
+              });
+            }
+            
+            if (txVm.isLoading) {
+              return _buildLoadingState();
+            }
+            
+            // Use allTransactions for comprehensive data, but aggregate will filter by month
+            _aggregateTransactions(txVm.allTransactions);
+            
+            return RefreshIndicator(
+              color: AppTheme.primaryColor,
+              onRefresh: () => _refreshData(txVm),
+              child: Column(
+                children: [
+                  _buildViewModeSelector(),
+                  Expanded(
+                    child: _buildSelectedView(),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -508,9 +522,13 @@ class _SpendingHeatmapScreenState extends State<SpendingHeatmapScreen>
         GestureDetector(
           onTap: () {
             HapticFeedback.lightImpact();
+            final newFocused = DateTime(_focusedDay.year, _focusedDay.month - 1, 1);
             setState(() {
-              _focusedDay = DateTime(_focusedDay.year, _focusedDay.month - 1);
+              _focusedDay = newFocused;
+              _selectedDay = newFocused;
             });
+            Provider.of<vm.TransactionViewModel>(context, listen: false)
+                .loadTransactionsByMonth(newFocused);
           },
           child: Container(
             padding: const EdgeInsets.all(12),
@@ -573,9 +591,13 @@ class _SpendingHeatmapScreenState extends State<SpendingHeatmapScreen>
         GestureDetector(
           onTap: () {
             HapticFeedback.lightImpact();
+            final newFocused = DateTime(_focusedDay.year, _focusedDay.month + 1, 1);
             setState(() {
-              _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1);
+              _focusedDay = newFocused;
+              _selectedDay = newFocused;
             });
+            Provider.of<vm.TransactionViewModel>(context, listen: false)
+                .loadTransactionsByMonth(newFocused);
           },
           child: Container(
             padding: const EdgeInsets.all(12),
@@ -610,6 +632,7 @@ class _SpendingHeatmapScreenState extends State<SpendingHeatmapScreen>
     final spendingData = _spendingData[DateTime(date.year, date.month, date.day)];
     final hasSpending = spendingData != null && spendingData.amount > 0;
     final intensity = hasSpending ? spendingData.getIntensityLevel(_maxDailySpending) : 0.0;
+    final heatColor = hasSpending ? spendingData.getHeatColor(_maxDailySpending) : Colors.transparent;
     
     // Debug logging for color issues
     if (hasSpending && date.day <= 5) {
@@ -625,13 +648,12 @@ class _SpendingHeatmapScreenState extends State<SpendingHeatmapScreen>
     if (isOutside) {
       textColor = Colors.grey.shade300;
     } else if (hasSpending) {
-      final heatColor = spendingData.getHeatColor(_maxDailySpending);
       gradientColors = [
         heatColor.withValues(alpha: 0.8),
         heatColor.withValues(alpha: 0.6),
       ];
       backgroundColor = heatColor.withValues(alpha: isSelected ? 0.9 : 0.7);
-      textColor = intensity >= 3 ? Colors.white : const Color(0xFF1E293B);
+      textColor = intensity >= 0.65 ? Colors.white : const Color(0xFF1E293B);
     }
     
     if (isSelected) {
@@ -678,7 +700,7 @@ class _SpendingHeatmapScreenState extends State<SpendingHeatmapScreen>
             : null,
           boxShadow: hasSpending && !isOutside ? [
             BoxShadow(
-              color: spendingData.getHeatColor(intensity).withValues(alpha: 0.3),
+              color: heatColor.withValues(alpha: 0.3),
               blurRadius: isSelected ? 8 : 4,
               offset: const Offset(0, 2),
               spreadRadius: isSelected ? 1 : 0,
@@ -710,8 +732,8 @@ class _SpendingHeatmapScreenState extends State<SpendingHeatmapScreen>
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              spendingData.getHeatColor(intensity),
-                              spendingData.getHeatColor(intensity).withValues(alpha: 0.7),
+                              heatColor,
+                              heatColor.withValues(alpha: 0.7),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(2),
@@ -1515,9 +1537,9 @@ class _SpendingHeatmapScreenState extends State<SpendingHeatmapScreen>
       elevation: 0,
       backgroundColor: Colors.transparent,
       flexibleSpace: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+            colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -1539,15 +1561,24 @@ class _SpendingHeatmapScreenState extends State<SpendingHeatmapScreen>
       actions: [
         IconButton(
           icon: const Icon(Icons.tune, color: Colors.white),
-          onPressed: _showAdvancedFilters,
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            _showAdvancedFilters();
+          },
         ),
         IconButton(
           icon: const Icon(Icons.share, color: Colors.white),
-          onPressed: _shareHeatmap,
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            _shareHeatmap();
+          },
         ),
         IconButton(
           icon: const Icon(Icons.info_outline, color: Colors.white),
-          onPressed: _showInfoDialog,
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            _showInfoDialog();
+          },
         ),
       ],
     );
@@ -1567,7 +1598,7 @@ class _SpendingHeatmapScreenState extends State<SpendingHeatmapScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
+              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
             ),
             SizedBox(height: 24),
             Text(
@@ -1641,15 +1672,15 @@ class _SpendingHeatmapScreenState extends State<SpendingHeatmapScreen>
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             gradient: isSelected
-                ? const LinearGradient(
-                    colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                ? LinearGradient(
+                    colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
                   )
                 : null,
             borderRadius: BorderRadius.circular(12),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
@@ -3163,15 +3194,31 @@ class _SpendingHeatmapScreenState extends State<SpendingHeatmapScreen>
     // Calculate monthly projection
     final currentMonthSpending = _spendingData.values.fold<double>(0, (sum, data) => sum + data.amount);
     final daysInMonth = DateTime(_focusedDay.year, _focusedDay.month + 1, 0).day;
-    final daysPassed = _focusedDay.day;
+    final now = DateTime.now();
+    final focusedMonthStart = DateTime(_focusedDay.year, _focusedDay.month, 1);
+
+    int daysPassed;
+    if (now.year == _focusedDay.year && now.month == _focusedDay.month) {
+      daysPassed = now.day.clamp(0, daysInMonth);
+    } else if (DateTime(now.year, now.month, 1).isAfter(focusedMonthStart)) {
+      // Focused month is in the past
+      daysPassed = daysInMonth;
+    } else {
+      // Focused month is in the future
+      daysPassed = 0;
+    }
+
     final projectedMonthly = daysPassed > 0 ? (currentMonthSpending / daysPassed) * daysInMonth : 0;
+    final projectionDeltaPct = currentMonthSpending > 0
+        ? ((projectedMonthly / currentMonthSpending - 1) * 100)
+        : 0.0;
     
     predictions.add({
       'value': '\$${projectedMonthly.toStringAsFixed(0)}',
       'label': 'Monthly Projection',
       'color': const Color(0xFF8B5CF6),
       'icon': Icons.trending_up,
-      'trend': '${((projectedMonthly / currentMonthSpending - 1) * 100).toStringAsFixed(0)}%',
+      'trend': '${projectionDeltaPct.toStringAsFixed(0)}%',
       'trendColor': projectedMonthly > currentMonthSpending ? Colors.red : Colors.green,
       'trendIcon': projectedMonthly > currentMonthSpending ? Icons.arrow_upward : Icons.arrow_downward,
     });
