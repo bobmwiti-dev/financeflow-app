@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../utils/currency_extensions.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/services.dart';
 
 import '../../models/goal_model.dart';
 import '../../viewmodels/goal_viewmodel.dart';
@@ -11,8 +12,9 @@ import 'edit_goal_screen.dart';
 
 class GoalDetailsScreen extends StatefulWidget {
   final Goal goal;
+  final String? heroTag;
 
-  const GoalDetailsScreen({super.key, required this.goal});
+  const GoalDetailsScreen({super.key, required this.goal, this.heroTag});
 
   @override
   State<GoalDetailsScreen> createState() => _GoalDetailsScreenState();
@@ -20,14 +22,14 @@ class GoalDetailsScreen extends StatefulWidget {
 
 class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
 
-  static const Color _accentColor = Color(0xFF6366F1);
+  static const Color _accentColor = AppTheme.primaryColor;
 
   LinearGradient get _accentGradient => const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          Color(0xFF6366F1),
-          Color(0xFF8B5CF6),
+          AppTheme.primaryColor,
+          AppTheme.secondaryColor,
         ],
       );
 
@@ -46,13 +48,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
       border: Border.all(
         color: colorScheme.outlineVariant.withValues(alpha: 0.6),
       ),
-      boxShadow: [
-        BoxShadow(
-          color: colorScheme.shadow.withValues(alpha: 0.08),
-          blurRadius: 28,
-          offset: const Offset(0, 16),
-        ),
-      ],
+      boxShadow: AppTheme.boxShadow,
     );
   }
 
@@ -77,23 +73,11 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
         );
 
         return Scaffold(
-          extendBodyBehindAppBar: true,
-          backgroundColor: Colors.transparent,
+          extendBodyBehindAppBar: false,
           appBar: AppBar(
-            elevation: 0,
-            backgroundColor: Colors.transparent,
-            flexibleSpace: Container(
-              decoration: BoxDecoration(gradient: _accentGradient),
-            ),
             title: Text(
               latestGoal.name,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.2,
-              ),
             ),
-            foregroundColor: Colors.white,
             actions: [
               IconButton(
                 icon: const Icon(Icons.edit_outlined),
@@ -114,8 +98,9 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  colorScheme.surface,
-                  colorScheme.surfaceContainerHighest,
+                  colorScheme.primary.withAlpha((0.06 * 255).toInt()),
+                  theme.scaffoldBackgroundColor,
+                  theme.scaffoldBackgroundColor,
                 ],
               ),
             ),
@@ -126,7 +111,6 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                   sliver: SliverToBoxAdapter(
                     child: Column(
                       children: [
-                        SizedBox(height: kToolbarHeight + MediaQuery.of(context).padding.top),
                         _buildHeader(context, latestGoal),
                         const SizedBox(height: 24),
                         _buildInfoCard(context, latestGoal),
@@ -148,10 +132,13 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
             ),
           ),
           floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => _showAddFundsDialog(context, latestGoal),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              _showAddFundsDialog(context, latestGoal);
+            },
             label: const Text('Add Funds'),
             icon: const Icon(Icons.add),
-            backgroundColor: _accentColor,
+            backgroundColor: AppTheme.accentColor,
           ),
         );
       },
@@ -172,20 +159,14 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
       progressColor = AppTheme.successColor;
     }
 
-    return Padding(
+    final header = Padding(
       padding: const EdgeInsets.symmetric(vertical: 16.0),
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: theme.colorScheme.surface,
-          boxShadow: [
-            BoxShadow(
-              color: theme.colorScheme.shadow.withValues(alpha: 0.08),
-              blurRadius: 28,
-              offset: const Offset(0, 16),
-            ),
-          ],
+          boxShadow: AppTheme.boxShadow,
         ),
         child: SizedBox(
           width: 180,
@@ -230,6 +211,16 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
             ],
           ),
         ),
+      ),
+    );
+
+    if (widget.heroTag == null) return header;
+
+    return Hero(
+      tag: widget.heroTag!,
+      child: Material(
+        type: MaterialType.transparency,
+        child: header,
       ),
     );
   }
@@ -467,6 +458,12 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                             final messenger = ScaffoldMessenger.of(context);
 
                             final success = await viewModel.updateGoalProgress(currentGoal, amount);
+
+                            if (success) {
+                              HapticFeedback.heavyImpact();
+                            } else {
+                              HapticFeedback.vibrate();
+                            }
 
                             if (!mounted) return;
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -36,14 +37,14 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
   late AnimationController _listAnimationController;
   bool _isInteractiveMode = false;
 
-  static const Color _accentColor = Color(0xFF6366F1);
+  static const Color _accentColor = AppTheme.primaryColor;
 
   LinearGradient get _accentGradient => const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          Color(0xFF6366F1),
-          Color(0xFF8B5CF6),
+          AppTheme.primaryColor,
+          AppTheme.secondaryColor,
         ],
       );
 
@@ -58,17 +59,11 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
           colorScheme.surfaceContainerHighest,
         ],
       ),
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(AppTheme.borderRadius),
       border: Border.all(
         color: colorScheme.outlineVariant.withValues(alpha: 0.6),
       ),
-      boxShadow: [
-        BoxShadow(
-          color: colorScheme.shadow.withValues(alpha: 0.08),
-          blurRadius: 28,
-          offset: const Offset(0, 16),
-        ),
-      ],
+      boxShadow: AppTheme.boxShadow,
     );
   }
 
@@ -101,6 +96,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
   }
 
   void _onItemSelected(int index) {
+    HapticFeedback.selectionClick();
     Navigator.of(context).pop(); // close drawer
     switch (index) {
       case 0:
@@ -143,6 +139,13 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
   void _showSortOptions() {
     showModalBottomSheet(
       context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppTheme.borderRadius * 1.25),
+        ),
+      ),
       builder: (context) {
         return Wrap(
           children: <Widget>[
@@ -150,6 +153,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
               leading: const Icon(Icons.star_border),
               title: const Text('Sort by Priority'),
               onTap: () {
+                HapticFeedback.selectionClick();
                 setState(() => _currentSortOption = GoalSortOption.priority);
                 Navigator.pop(context);
               },
@@ -158,6 +162,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
               leading: const Icon(Icons.calendar_today),
               title: const Text('Sort by Target Date'),
               onTap: () {
+                HapticFeedback.selectionClick();
                 setState(() => _currentSortOption = GoalSortOption.targetDate);
                 Navigator.pop(context);
               },
@@ -166,6 +171,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
               leading: const Icon(Icons.show_chart),
               title: const Text('Sort by Progress'),
               onTap: () {
+                HapticFeedback.selectionClick();
                 setState(() => _currentSortOption = GoalSortOption.progress);
                 Navigator.pop(context);
               },
@@ -174,6 +180,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
               leading: const Icon(Icons.sort_by_alpha),
               title: const Text('Sort by Name'),
               onTap: () {
+                HapticFeedback.selectionClick();
                 setState(() => _currentSortOption = GoalSortOption.name);
                 Navigator.pop(context);
               },
@@ -189,31 +196,15 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return Scaffold(
-      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(gradient: _accentGradient),
-        ),
-        title: ShaderMask(
-          shaderCallback: (bounds) => const LinearGradient(
-            colors: [Colors.white, Colors.white70],
-          ).createShader(bounds),
-          child: const Text(
-            'Savings Goals',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.3,
-            ),
-          ),
-        ),
+        title: const Text('Goals'),
         actions: [
           IconButton(
             icon: const Icon(Icons.sort),
-            color: Colors.white,
-            onPressed: _showSortOptions,
+            onPressed: () {
+              HapticFeedback.selectionClick();
+              _showSortOptions();
+            },
           ),
         ],
       ),
@@ -227,20 +218,33 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              colorScheme.surface,
-              colorScheme.surfaceContainerHighest,
+              colorScheme.primary.withAlpha((0.06 * 255).toInt()),
+              theme.scaffoldBackgroundColor,
+              theme.scaffoldBackgroundColor,
             ],
           ),
         ),
         child: Consumer<GoalViewModel>(
           builder: (context, goalViewModel, child) {
-            return Column(
-              children: [
-                _buildSummaryCard(goalViewModel),
-                Expanded(
-                  child: _buildGoalsList(goalViewModel),
-                ),
-              ],
+            return RefreshIndicator(
+              onRefresh: () async {
+                goalViewModel.loadGoals();
+              },
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                    sliver: SliverToBoxAdapter(
+                      child: _buildSummaryCard(goalViewModel),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+                    sliver: _buildGoalsSliver(goalViewModel),
+                  ),
+                ],
+              ),
             );
           },
         ),
@@ -272,7 +276,8 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     
     final totalGoals = viewModel.getTotalSavingsGoals();
     final currentSavings = viewModel.getTotalCurrentSavings();
-    final progress = viewModel.getOverallProgress();
+    final progressRatio = viewModel.getOverallProgress();
+    final progressPercent = (progressRatio * 100).clamp(0.0, 100.0);
     
     return GestureDetector(
       onTap: () {
@@ -286,7 +291,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
         }
       },
       child: Container(
-        margin: const EdgeInsets.all(16.0),
+        margin: EdgeInsets.zero,
         decoration: _premiumCardDecoration(theme),
         child: AnimatedBuilder(
           animation: _summaryAnimationController,
@@ -366,17 +371,17 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                       Expanded(
                         child: _buildStatCard(
                           'Progress',
-                          '${progress.toStringAsFixed(1)}%',
+                          '${progressPercent.toStringAsFixed(1)}%',
                           'Overall completion',
                           Icons.trending_up_rounded,
-                          progress >= 75 ? Colors.green : progress >= 50 ? Colors.orange : Colors.red,
+                          progressPercent >= 75 ? Colors.green : progressPercent >= 50 ? Colors.orange : Colors.red,
                           1,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 20),
-                  _buildInteractiveProgressBar(progress),
+                  _buildInteractiveProgressBar(progressPercent),
                 ],
               ),
             );
@@ -597,350 +602,478 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildGoalsList(GoalViewModel viewModel) {
+  Widget _buildGoalsSliver(GoalViewModel viewModel) {
     if (viewModel.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    
-    if (viewModel.goals.isEmpty) {
-      return Center(
-        child: Container(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: _accentGradient,
-                  borderRadius: BorderRadius.circular(32),
-                ),
-                child: Icon(
-                  Icons.savings_rounded,
-                  size: 64,
-                  color: Colors.white.withValues(alpha: 0.9),
-                ),
-              ),
-              const SizedBox(height: 24),
-              ShaderMask(
-                shaderCallback: (bounds) => LinearGradient(
-                  colors: [
-                    _accentColor,
-                    _accentColor.withValues(alpha: 0.7),
-                  ],
-                ).createShader(bounds),
-                child: const Text(
-                  'Start Your Savings Journey',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Set your first savings goal and watch your progress grow',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 32),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      _accentColor.withValues(alpha: 0.1),
-                      _accentColor.withValues(alpha: 0.05),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: _accentColor.withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.add_circle_outline_rounded,
-                      color: _accentColor,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Tap the + button to get started',
-                      style: TextStyle(
-                        color: _accentColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ).animate()
-          .fadeIn(duration: 800.ms)
-          .slideY(begin: 0.3, duration: 800.ms, curve: Curves.easeOutCubic)
-          .shimmer(duration: 2000.ms, delay: 1000.ms),
+      return SliverToBoxAdapter(
+        child: _buildLoadingState(),
       );
     }
-    
+
+    if (viewModel.goals.isEmpty) {
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: _buildEmptyState(),
+      );
+    }
+
     final goals = List<Goal>.from(viewModel.goals);
 
-    // Sort the list based on the current option
     goals.sort((a, b) {
       switch (_currentSortOption) {
         case GoalSortOption.priority:
-          return b.priority.compareTo(a.priority); // Higher priority first
+          return b.priority.compareTo(a.priority);
         case GoalSortOption.targetDate:
           return (a.targetDate ?? DateTime.now()).compareTo(b.targetDate ?? DateTime.now());
         case GoalSortOption.progress:
           final progressA = a.targetAmount > 0 ? a.currentAmount / a.targetAmount : 0;
           final progressB = b.targetAmount > 0 ? b.currentAmount / b.targetAmount : 0;
-          return progressA.compareTo(progressB); // Lower progress first
+          return progressA.compareTo(progressB);
         case GoalSortOption.name:
           return a.name.compareTo(b.name);
       }
     });
 
-    return AnimatedBuilder(
-      animation: _listAnimationController,
-      builder: (context, child) {
-        return ListView.builder(
-          padding: const EdgeInsets.all(16.0),
-          itemCount: goals.length,
-          itemBuilder: (context, index) {
-            final goal = goals[index];
-            return Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              child: GoalCard(
-                name: goal.name,
-                currentAmount: goal.currentAmount,
-                targetAmount: goal.targetAmount,
-                targetDate: goal.targetDate ?? DateTime.now(),
-                category: goal.category ?? 'General',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => GoalDetailsScreen(goal: goal),
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          final goal = goals[index];
+          return Padding(
+            padding: EdgeInsets.only(bottom: index == goals.length - 1 ? 0 : 16),
+            child: GoalCard(
+              heroTag: goal.id != null ? 'goal_${goal.id}' : null,
+              name: goal.name,
+              currentAmount: goal.currentAmount,
+              targetAmount: goal.targetAmount,
+              targetDate: goal.targetDate ?? DateTime.now(),
+              category: goal.category ?? 'General',
+              onTap: () {
+                HapticFeedback.selectionClick();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => GoalDetailsScreen(
+                      goal: goal,
+                      heroTag: goal.id != null ? 'goal_${goal.id}' : null,
                     ),
-                  );
-                },
-                onAddFunds: () {
-                  _showEnhancedAddFundsDialog(goal);
-                },
-              ),
-            ).animate(delay: Duration(milliseconds: 100 * index))
+                  ),
+                );
+              },
+              onAddFunds: () {
+                HapticFeedback.lightImpact();
+                _showEnhancedAddFundsDialog(goal);
+              },
+            ),
+          ).animate(delay: Duration(milliseconds: 100 * index))
               .fadeIn(duration: 500.ms)
               .slideX(
                 begin: index.isEven ? -0.3 : 0.3,
                 duration: 500.ms,
                 curve: Curves.easeOutCubic,
-              )
-              .shimmer(
-                duration: 1500.ms,
-                delay: Duration(milliseconds: 200 + (100 * index)),
               );
-          },
-        );
-      },
+        },
+        childCount: goals.length,
+      ),
     );
   }
+
+  Widget _buildLoadingState() {
+    final theme = Theme.of(context);
+    return Column(
+      children: List.generate(3, (index) {
+        return Container(
+          height: 120,
+          margin: EdgeInsets.only(bottom: index == 2 ? 0 : 16),
+          decoration: _premiumCardDecoration(theme),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 40),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        height: 14,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withValues(alpha: 40),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        height: 12,
+                        width: 160,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withValues(alpha: 30),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        height: 10,
+                        width: 120,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withValues(alpha: 25),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ).animate()
+          .fadeIn(duration: 300.ms)
+          .shimmer(duration: 1300.ms, delay: (150 * index).ms);
+      }),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: _accentGradient,
+                borderRadius: BorderRadius.circular(32),
+              ),
+              child: Icon(
+                Icons.savings_rounded,
+                size: 64,
+                color: Colors.white.withValues(alpha: 0.9),
+              ),
+            ),
+            const SizedBox(height: 24),
+            ShaderMask(
+              shaderCallback: (bounds) => LinearGradient(
+                colors: [
+                  _accentColor,
+                  _accentColor.withValues(alpha: 0.7),
+                ],
+              ).createShader(bounds),
+              child: const Text(
+                'Create your first goal',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Set a savings target and track your progress over time.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 32),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    _accentColor.withValues(alpha: 0.1),
+                    _accentColor.withValues(alpha: 0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _accentColor.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.add_circle_outline_rounded,
+                    color: _accentColor,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Tap + to get started',
+                    style: TextStyle(
+                      color: _accentColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ).animate()
+        .fadeIn(duration: 800.ms)
+        .slideY(begin: 0.3, duration: 800.ms, curve: Curves.easeOutCubic),
+    );
+  }
+
+  // _buildGoalsList replaced by sliver-based layout (_buildGoalsSliver)
 
   void _showEnhancedAddFundsDialog(Goal goal) {
     final TextEditingController amountController = TextEditingController();
     final currencyFormat = NumberFormat.currency(symbol: '\$');
-    
+
+    HapticFeedback.lightImpact();
+
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white,
-                  _accentColor.withValues(alpha: 0.02),
-                  Colors.white,
-                ],
-              ),
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        _accentColor.withValues(alpha: 0.1),
-                        _accentColor.withValues(alpha: 0.05),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
+        bool isSubmitting = false;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            Future<void> submit() async {
+              final amount = double.tryParse(amountController.text.trim());
+              if (amount == null || amount <= 0) {
+                HapticFeedback.vibrate();
+                return;
+              }
+
+              setState(() {
+                isSubmitting = true;
+              });
+
+              final vm = Provider.of<GoalViewModel>(context, listen: false);
+              final messenger = ScaffoldMessenger.of(context);
+              final navigator = Navigator.of(context);
+
+              final success = await vm.updateGoalProgress(goal, amount);
+
+              if (success) {
+                HapticFeedback.heavyImpact();
+              } else {
+                HapticFeedback.vibrate();
+              }
+
+              if (!context.mounted) return;
+
+              navigator.pop();
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text(
+                    success
+                        ? 'Added ${currencyFormat.format(amount)} to ${goal.name}!'
+                        : 'Failed to add funds. Please try again.',
                   ),
-                  child: Icon(
-                    Icons.add_circle_outline_rounded,
-                    color: _accentColor,
-                    size: 32,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                const SizedBox(height: 20),
-                ShaderMask(
-                  shaderCallback: (bounds) => LinearGradient(
+              );
+            }
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                     colors: [
-                      _accentColor,
-                      _accentColor.withValues(alpha: 0.8),
+                      Colors.white,
+                      _accentColor.withValues(alpha: 0.02),
+                      Colors.white,
                     ],
-                  ).createShader(bounds),
-                  child: Text(
-                    'Add Funds to ${goal.name}',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: -0.5,
-                    ),
-                    textAlign: TextAlign.center,
                   ),
+                  borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                  boxShadow: AppTheme.boxShadow,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Current: ${currencyFormat.format(goal.currentAmount)} of ${currencyFormat.format(goal.targetAmount)}',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _accentColor.withValues(alpha: 0.2),
-                    ),
-                    gradient: LinearGradient(
-                      colors: [
-                        _accentColor.withValues(alpha: 0.02),
-                        Colors.white,
-                      ],
-                    ),
-                  ),
-                  child: TextField(
-                    controller: amountController,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    decoration: InputDecoration(
-                      labelText: 'Amount to add',
-                      prefixText: '\$',
-                      prefixStyle: TextStyle(
-                        color: _accentColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.all(20),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            _accentColor.withValues(alpha: 0.1),
+                            _accentColor.withValues(alpha: 0.05),
+                          ],
                         ),
-                        child: Text(
-                          'Cancel',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Icon(
+                        Icons.add_circle_outline_rounded,
+                        color: _accentColor,
+                        size: 32,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          final amount = double.tryParse(amountController.text.trim());
-                          if (amount != null && amount > 0) {
-                            final vm = Provider.of<GoalViewModel>(context, listen: false);
-                            vm.updateGoalProgress(goal, amount);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Added ${currencyFormat.format(amount)} to ${goal.name}!'),
-                                backgroundColor: Colors.green,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            );
-                          }
-                          Navigator.pop(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _accentColor,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
+                    const SizedBox(height: 20),
+                    ShaderMask(
+                      shaderCallback: (bounds) => LinearGradient(
+                        colors: [
+                          _accentColor,
+                          _accentColor.withValues(alpha: 0.8),
+                        ],
+                      ).createShader(bounds),
+                      child: Text(
+                        'Add Funds to ${goal.name}',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: -0.5,
                         ),
-                        child: const Text(
-                          'Add Funds',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Current: ${currencyFormat.format(goal.currentAmount)} of ${currencyFormat.format(goal.targetAmount)}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: _accentColor.withValues(alpha: 0.2),
+                        ),
+                        gradient: LinearGradient(
+                          colors: [
+                            _accentColor.withValues(alpha: 0.02),
+                            Colors.white,
+                          ],
                         ),
                       ),
+                      child: TextField(
+                        controller: amountController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Amount to add',
+                          prefixText: '\$',
+                          prefixStyle: TextStyle(
+                            color: _accentColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.all(20),
+                        ),
+                        onSubmitted: (_) {
+                          if (!isSubmitting) {
+                            HapticFeedback.selectionClick();
+                            submit();
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: isSubmitting
+                                ? null
+                                : () {
+                                    HapticFeedback.selectionClick();
+                                    Navigator.pop(context);
+                                  },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              'Cancel',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: isSubmitting
+                                ? null
+                                : () {
+                                    HapticFeedback.selectionClick();
+                                    submit();
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _accentColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: AnimatedSwitcher(
+                              duration: AppTheme.mediumAnimationDuration,
+                              child: isSubmitting
+                                  ? const SizedBox(
+                                      key: ValueKey('submitting'),
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Add Funds',
+                                      key: ValueKey('add'),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ).animate()
-            .fadeIn(duration: 300.ms)
-            .scale(begin: const Offset(0.8, 0.8), duration: 300.ms, curve: Curves.easeOutBack),
+              ).animate()
+                .fadeIn(duration: 300.ms)
+                .scale(begin: const Offset(0.8, 0.8), duration: 300.ms, curve: Curves.easeOutBack),
+            );
+          },
         );
       },
     );

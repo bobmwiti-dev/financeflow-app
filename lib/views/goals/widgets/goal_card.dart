@@ -5,6 +5,7 @@ import 'package:percent_indicator/percent_indicator.dart';
 import '../../../themes/app_theme.dart';
 
 class GoalCard extends StatelessWidget {
+  final String? heroTag;
   final String name;
   final double currentAmount;
   final double targetAmount;
@@ -13,11 +14,12 @@ class GoalCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onAddFunds;
 
-  static const double _radius = 24;
-  static const Color _accentColor = Color(0xFF6366F1);
+  static const double _radius = AppTheme.borderRadius;
+  static const Color _accentColor = AppTheme.primaryColor;
 
   const GoalCard({
     super.key,
+    this.heroTag,
     required this.name,
     required this.currentAmount,
     required this.targetAmount,
@@ -34,53 +36,59 @@ class GoalCard extends StatelessWidget {
     final currencyFormat = NumberFormat.currency(symbol: '\$');
     final progress = (targetAmount > 0) ? (currentAmount / targetAmount) : 0.0;
     final daysLeft = targetDate.difference(DateTime.now()).inDays;
-    
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.surface,
-            colorScheme.surfaceContainerHighest,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(_radius),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.08),
-            blurRadius: 28,
-            offset: const Offset(0, 16),
+
+    final content = _PressScale(
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              colorScheme.surface,
+              colorScheme.surfaceContainerHighest,
+            ],
           ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(_radius),
-        child: InkWell(
-          onTap: onTap,
           borderRadius: BorderRadius.circular(_radius),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildCircularProgress(progress),
-                    const SizedBox(width: 16),
-                    _buildGoalDetails(currencyFormat, daysLeft),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _buildActionButtons(),
-              ],
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+          ),
+          boxShadow: AppTheme.boxShadow,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(_radius),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(_radius),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildCircularProgress(progress),
+                      const SizedBox(width: 16),
+                      _buildGoalDetails(currencyFormat, daysLeft),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _buildActionButtons(),
+                ],
+              ),
             ),
           ),
         ),
+      ),
+    );
+
+    if (heroTag == null) return content;
+
+    return Hero(
+      tag: heroTag!,
+      child: Material(
+        type: MaterialType.transparency,
+        child: content,
       ),
     );
   }
@@ -181,6 +189,46 @@ class GoalCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _PressScale extends StatefulWidget {
+  final Widget child;
+
+  const _PressScale({
+    required this.child,
+  });
+
+  @override
+  State<_PressScale> createState() => _PressScaleState();
+}
+
+class _PressScaleState extends State<_PressScale> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) {
+        if (!mounted) return;
+        setState(() => _pressed = true);
+      },
+      onPointerUp: (_) {
+        if (!mounted) return;
+        setState(() => _pressed = false);
+      },
+      onPointerCancel: (_) {
+        if (!mounted) return;
+        setState(() => _pressed = false);
+      },
+      child: AnimatedScale(
+        scale: _pressed ? 0.985 : 1.0,
+        duration: AppTheme.shortAnimationDuration,
+        curve: Curves.easeOutCubic,
+        child: widget.child,
+      ),
     );
   }
 }

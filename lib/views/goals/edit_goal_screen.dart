@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -26,16 +27,7 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
   String? _selectedIcon;
   bool _isSaving = false;
 
-  static const Color _accentColor = Color(0xFF6366F1);
-
-  LinearGradient get _accentGradient => const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Color(0xFF6366F1),
-          Color(0xFF8B5CF6),
-        ],
-      );
+  static const Color _accentColor = AppTheme.primaryColor;
 
   BoxDecoration _premiumCardDecoration(ThemeData theme) {
     final colorScheme = theme.colorScheme;
@@ -48,17 +40,11 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
           colorScheme.surfaceContainerHighest,
         ],
       ),
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(AppTheme.borderRadius),
       border: Border.all(
         color: colorScheme.outlineVariant.withValues(alpha: 0.6),
       ),
-      boxShadow: [
-        BoxShadow(
-          color: colorScheme.shadow.withValues(alpha: 0.08),
-          blurRadius: 28,
-          offset: const Offset(0, 16),
-        ),
-      ],
+      boxShadow: AppTheme.boxShadow,
     );
   }
 
@@ -83,6 +69,7 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
   }
 
   Future<void> _pickDate() async {
+    HapticFeedback.selectionClick();
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
@@ -100,6 +87,8 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+
+    HapticFeedback.mediumImpact();
 
     setState(() => _isSaving = true);
     final viewModel = context.read<GoalViewModel>();
@@ -132,6 +121,7 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
   }
 
   Future<void> _showDeleteConfirmation() async {
+    HapticFeedback.lightImpact();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -175,27 +165,8 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
     final dateFormat = DateFormat('MMM dd, yyyy');
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(gradient: _accentGradient),
-        ),
-        title: ShaderMask(
-          shaderCallback: (bounds) => const LinearGradient(
-            colors: [Colors.white, Colors.white70],
-          ).createShader(bounds),
-          child: const Text(
-            'Edit Goal',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.3,
-            ),
-          ),
-        ),
-        foregroundColor: Colors.white,
+        title: const Text('Edit Goal'),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_outline),
@@ -210,8 +181,9 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              colorScheme.surface,
-              colorScheme.surfaceContainerHighest,
+              colorScheme.primary.withAlpha((0.06 * 255).toInt()),
+              theme.scaffoldBackgroundColor,
+              theme.scaffoldBackgroundColor,
             ],
           ),
         ),
@@ -288,12 +260,26 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
                       child: ElevatedButton(
                         onPressed: _isSaving ? null : _save,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: _accentColor,
+                          backgroundColor: AppTheme.primaryColor,
                           foregroundColor: Colors.white,
                         ),
-                        child: _isSaving
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text('Update Goal'),
+                        child: AnimatedSwitcher(
+                          duration: AppTheme.mediumAnimationDuration,
+                          child: _isSaving
+                              ? const SizedBox(
+                                  key: ValueKey('saving'),
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text(
+                                  'Update Goal',
+                                  key: ValueKey('save'),
+                                ),
+                        ),
                       ),
                     ),
                   ],
@@ -333,7 +319,10 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
           final description = iconDescriptions[iconKey] ?? iconKey;
           
           return GestureDetector(
-            onTap: () => setState(() => _selectedIcon = iconKey),
+            onTap: () {
+              HapticFeedback.selectionClick();
+              setState(() => _selectedIcon = iconKey);
+            },
             child: Container(
               margin: const EdgeInsets.only(right: 12),
               width: 80, // Increased width for descriptions
