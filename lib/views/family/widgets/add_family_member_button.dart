@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../themes/app_theme.dart';
 
 class AddFamilyMemberButton extends StatelessWidget {
@@ -12,7 +13,10 @@ class AddFamilyMemberButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FloatingActionButton.extended(
-      onPressed: onPressed,
+      onPressed: () {
+        HapticFeedback.lightImpact();
+        onPressed();
+      },
       icon: const Icon(Icons.person_add),
       label: const Text('Add Member'),
       backgroundColor: AppTheme.accentColor,

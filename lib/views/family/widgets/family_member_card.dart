@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../themes/app_theme.dart';
@@ -32,6 +33,7 @@ class _FamilyMemberCardState extends State<FamilyMemberCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   bool _isHovered = false;
+  bool _pressed = false;
 
   @override
   void initState() {
@@ -57,8 +59,26 @@ class _FamilyMemberCardState extends State<FamilyMemberCard>
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) {
+          if (!mounted) return;
+          setState(() => _pressed = true);
+        },
+        onPointerUp: (_) {
+          if (!mounted) return;
+          setState(() => _pressed = false);
+        },
+        onPointerCancel: (_) {
+          if (!mounted) return;
+          setState(() => _pressed = false);
+        },
+        child: AnimatedScale(
+          scale: _pressed ? 0.985 : 1.0,
+          duration: AppTheme.shortAnimationDuration,
+          curve: Curves.easeOutCubic,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -69,14 +89,8 @@ class _FamilyMemberCardState extends State<FamilyMemberCard>
               _isHovered ? Colors.grey[50]! : Colors.white,
             ],
           ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: _isHovered ? 0.15 : 0.08),
-              blurRadius: _isHovered ? 25 : 15,
-              offset: Offset(0, _isHovered ? 12 : 6),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+          boxShadow: AppTheme.boxShadow,
           border: Border.all(
             color: _isHovered
                 ? AppTheme.primaryColor.withValues(alpha: 0.3)
@@ -87,8 +101,11 @@ class _FamilyMemberCardState extends State<FamilyMemberCard>
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: widget.onTap,
-            borderRadius: BorderRadius.circular(20),
+            onTap: () {
+              HapticFeedback.selectionClick();
+              widget.onTap();
+            },
+            borderRadius: BorderRadius.circular(AppTheme.borderRadius),
             child: Padding(
               padding: const EdgeInsets.all(20.0),
               child: Column(
@@ -148,6 +165,8 @@ class _FamilyMemberCardState extends State<FamilyMemberCard>
                 ],
               ),
             ),
+          ),
+        ),
           ),
         ),
       ),
@@ -398,7 +417,10 @@ class _FamilyMemberCardState extends State<FamilyMemberCard>
             'Add Expense',
             Icons.add_shopping_cart,
             AppTheme.primaryColor,
-            widget.onAddExpense,
+            () {
+              HapticFeedback.lightImpact();
+              widget.onAddExpense();
+            },
           ),
         ),
         const SizedBox(width: 12),
@@ -408,7 +430,10 @@ class _FamilyMemberCardState extends State<FamilyMemberCard>
               'Requests',
               Icons.request_quote,
               Colors.indigo,
-              widget.onViewRequests!,
+              () {
+                HapticFeedback.selectionClick();
+                widget.onViewRequests!();
+              },
             ),
           ),
       ],

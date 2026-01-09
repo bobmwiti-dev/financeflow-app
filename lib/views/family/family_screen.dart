@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:logging/logging.dart';
@@ -56,6 +57,7 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
   }
 
   void _onItemSelected(int index) {
+    HapticFeedback.selectionClick();
     setState(() => _selectedIndex = index);
 
     final String route = NavigationService.routeForDrawerIndex(index);
@@ -78,15 +80,37 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: Colors.grey[50],
       body: Consumer<FamilyViewModel>(
         builder: (context, viewModel, _) {
-          return CustomScrollView(
-            slivers: [
-              _buildEnhancedAppBar(viewModel),
-              ..._buildBodySlivers(context, viewModel),
-            ],
+          return Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  colorScheme.primary.withAlpha((0.06 * 255).toInt()),
+                  theme.scaffoldBackgroundColor,
+                  theme.scaffoldBackgroundColor,
+                ],
+              ),
+            ),
+            child: RefreshIndicator(
+              onRefresh: () async {
+                HapticFeedback.selectionClick();
+                viewModel.startListening();
+              },
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  _buildEnhancedAppBar(viewModel),
+                  ..._buildBodySlivers(context, viewModel),
+                ],
+              ),
+            ),
           );
         },
       ),
@@ -100,6 +124,7 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
           
           return FloatingActionButton.extended(
             onPressed: () {
+              HapticFeedback.lightImpact();
               logger.info('Add family member button pressed');
               _showAddFamilyMemberDialog(context);
             },
@@ -163,6 +188,7 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
         IconButton(
           icon: const Icon(Icons.refresh, color: Colors.white),
           onPressed: () {
+            HapticFeedback.selectionClick();
             logger.info('Manual refresh triggered');
             viewModel.startListening();
           },
@@ -170,6 +196,7 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
         IconButton(
           icon: const Icon(Icons.request_quote, color: Colors.white),
           onPressed: () {
+            HapticFeedback.selectionClick();
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -334,17 +361,14 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                boxShadow: AppTheme.boxShadow,
               ),
               child: ElevatedButton.icon(
-                onPressed: () => _showAddFamilyMemberDialog(context),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  _showAddFamilyMemberDialog(context);
+                },
                 icon: const Icon(Icons.person_add_alt_1, color: Colors.white),
                 label: const Text(
                   'Add First Member',
@@ -359,7 +383,7 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
                   shadowColor: Colors.transparent,
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
+                    borderRadius: BorderRadius.circular(AppTheme.borderRadius),
                   ),
                 ),
               ),
@@ -392,14 +416,8 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
             Colors.grey[50]!,
           ],
         ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+        boxShadow: AppTheme.boxShadow,
       ),
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -609,14 +627,8 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+        boxShadow: AppTheme.boxShadow,
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -678,7 +690,10 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onPressed,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onPressed();
+        },
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
@@ -850,11 +865,12 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
             Colors.purple.withValues(alpha: 0.05),
           ],
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppTheme.borderRadius),
         border: Border.all(
           color: Colors.indigo.withValues(alpha: 0.2),
           width: 1,
         ),
+        boxShadow: AppTheme.boxShadow,
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -965,7 +981,10 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -1024,6 +1043,7 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
 
   // Collaboration feature methods
   void _showFamilyGoalsDialog() {
+    HapticFeedback.selectionClick();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1040,6 +1060,7 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
   }
 
   void _showSpendingInsights() {
+    HapticFeedback.selectionClick();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1056,6 +1077,7 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
   }
 
   void _showBudgetAlertsDialog() {
+    HapticFeedback.selectionClick();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1072,6 +1094,7 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
   }
 
   void _showFamilyChatDialog() {
+    HapticFeedback.selectionClick();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1102,14 +1125,19 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
       
       final success = await viewModel.addFamilyMember(result);
       if (success && context.mounted) {
+        HapticFeedback.heavyImpact();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${result.name} added successfully!'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
       } else if (context.mounted) {
+        HapticFeedback.vibrate();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Failed to add family member'),
@@ -1158,11 +1186,15 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                Navigator.of(dialogContext).pop();
+              },
               child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () async {
+                HapticFeedback.selectionClick();
                 final amount = double.tryParse(amountController.text) ?? 0.0;
 
                 if (amount > 0) {
@@ -1180,7 +1212,10 @@ class _FamilyScreenState extends State<FamilyScreen> with TickerProviderStateMix
                   );
 
                   if (success && context.mounted) {
+                    HapticFeedback.heavyImpact();
                     Navigator.of(dialogContext).pop();
+                  } else {
+                    HapticFeedback.vibrate();
                   }
                 }
               },

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../../models/family_member_model.dart';
+import '../../../themes/app_theme.dart';
 
 class AddFamilyMemberDialog extends StatefulWidget {
   const AddFamilyMemberDialog({super.key});
@@ -40,6 +41,7 @@ class _AddFamilyMemberDialogState extends State<AddFamilyMemberDialog> {
   }
 
   Future<void> _selectDateOfBirth() async {
+    HapticFeedback.selectionClick();
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now().subtract(const Duration(days: 365 * 10)),
@@ -57,6 +59,7 @@ class _AddFamilyMemberDialogState extends State<AddFamilyMemberDialog> {
 
   void _saveMember() {
     if (_formKey.currentState!.validate()) {
+      HapticFeedback.mediumImpact();
       final member = FamilyMember(
         name: _nameController.text.trim(),
         budget: double.parse(_budgetController.text),
@@ -75,9 +78,12 @@ class _AddFamilyMemberDialogState extends State<AddFamilyMemberDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+      ),
       title: const Row(
         children: [
-          Icon(Icons.person_add, color: Colors.blue),
+          Icon(Icons.person_add, color: AppTheme.primaryColor),
           SizedBox(width: 8),
           Text('Add Family Member'),
         ],
@@ -126,7 +132,7 @@ class _AddFamilyMemberDialogState extends State<AddFamilyMemberDialog> {
                 Container(
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppTheme.borderRadius),
                   ),
                   child: Column(
                     children: FamilyRole.values.map((role) {
@@ -149,6 +155,7 @@ class _AddFamilyMemberDialogState extends State<AddFamilyMemberDialog> {
                         groupValue: _selectedRole,
                         onChanged: (FamilyRole? value) {
                           if (value != null) {
+                            HapticFeedback.selectionClick();
                             setState(() {
                               _selectedRole = value;
                               _updateBudgetBasedOnRole();
@@ -203,7 +210,7 @@ class _AddFamilyMemberDialogState extends State<AddFamilyMemberDialog> {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppTheme.borderRadius),
                     ),
                     child: Row(
                       children: [
@@ -236,6 +243,7 @@ class _AddFamilyMemberDialogState extends State<AddFamilyMemberDialog> {
                           IconButton(
                             icon: const Icon(Icons.clear, size: 20),
                             onPressed: () {
+                              HapticFeedback.selectionClick();
                               setState(() {
                                 _dateOfBirth = null;
                               });
@@ -277,6 +285,7 @@ class _AddFamilyMemberDialogState extends State<AddFamilyMemberDialog> {
                   subtitle: const Text('Member can make purchases'),
                   value: _isActive,
                   onChanged: (bool value) {
+                    HapticFeedback.selectionClick();
                     setState(() {
                       _isActive = value;
                     });
@@ -317,13 +326,16 @@ class _AddFamilyMemberDialogState extends State<AddFamilyMemberDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            HapticFeedback.selectionClick();
+            Navigator.of(context).pop();
+          },
           child: const Text('Cancel'),
         ),
         ElevatedButton(
           onPressed: _saveMember,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
+            backgroundColor: AppTheme.primaryColor,
             foregroundColor: Colors.white,
           ),
           child: const Text('Add Member'),
